@@ -52,8 +52,11 @@ export default function RegisterPage() {
           setUsernameStatus('taken');
           setUsernameReason(result.reason || 'Not available');
         }
-      } catch {
-        setUsernameStatus('idle');
+      } catch (err: any) {
+        setUsernameStatus('invalid');
+        const msg = err.code === 'permission-denied' ? 'Permission denied (Refresh page)' : 'Error checking availability';
+        setUsernameReason(msg);
+        console.error('Username check error:', err);
       }
     }, 450);
 
@@ -63,19 +66,34 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (usernameStatus !== 'available') {
-      toast.error('Please choose a valid, available username.');
+      toast.error(usernameReason || 'Please choose a valid, available username.');
       return;
     }
     setLoading(true);
+    let credential;
     try {
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      await createUserProfile(credential.user.uid, email, username);
-      toast.success('Account created! Welcome 🎉');
-      router.push('/');
+      credential = await createUserWithEmailAndPassword(auth, email, password);
+      try {
+        await createUserProfile(credential.user.uid, email, username);
+        toast.success('Account created! Welcome 🎉');
+        router.push('/');
+      } catch (profileError: any) {
+        // Rollback on profile creation failure to prevent orphaned auth accounts
+        await credential.user.delete().catch(() => {});
+        const msg = profileError.code === 'permission-denied' 
+          ? 'Database permission denied. (Try refreshing the page)' 
+          : profileError.message || 'Failed to initialize profile.';
+        toast.error(msg);
+        setLoading(false);
+      }
     } catch (error: any) {
-      // If profile creation fails after auth creation we still auto-login,
-      // but we surface the profile error clearly.
-      toast.error(error.message || 'Failed to create account.');
+      let msg = error.message || 'Failed to create account.';
+      if (error.code === 'auth/email-already-in-use') msg = 'This email is already registered. Please sign in.';
+      else if (error.code === 'auth/invalid-email') msg = 'Invalid email address format.';
+      else if (error.code === 'auth/weak-password') msg = 'Password should be at least 6 characters.';
+      else if (error.code === 'auth/network-request-failed') msg = 'Network connection failed.';
+      
+      toast.error(msg);
       setLoading(false);
     }
   };
