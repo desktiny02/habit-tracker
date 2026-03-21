@@ -17,16 +17,42 @@ export default function NewTaskPage() {
   const [name, setName]     = useState('');
   const [points, setPoints] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  const [repeatType, setRepeatType] = useState<'daily' | 'weekly' | 'once'>('daily');
+  const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [targetDate, setTargetDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  const toggleDay = (dayIndex: number) => {
+    setRepeatDays(prev => 
+      prev.includes(dayIndex) 
+        ? prev.filter(d => d !== dayIndex) 
+        : [...prev, dayIndex].sort()
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     const pts = parseInt(points, 10);
     if (isNaN(pts) || pts <= 0) return void toast.error('Points must be a positive number');
+    
+    if (repeatType === 'weekly' && repeatDays.length === 0) {
+      return void toast.error('Please select at least one day for the task');
+    }
+    if (repeatType === 'once' && !targetDate) {
+      return void toast.error('Please select a date for the task');
+    }
 
     setLoading(true);
     try {
-      await createTask({ userId: user.uid, name, points: pts, repeatType: 'daily' });
+      await createTask({ 
+        userId: user.uid, 
+        name, 
+        points: pts, 
+        repeatType,
+        ...(repeatType === 'weekly' ? { repeatDays } : {}),
+        ...(repeatType === 'once' ? { targetDate } : {})
+      });
       toast.success('Task created!');
       router.push('/');
     } catch (err: any) {
@@ -51,7 +77,7 @@ export default function NewTaskPage() {
         </div>
 
         <h1 className="text-2xl font-bold mb-7" style={{ color: 'var(--text-primary)' }}>
-          New Daily Task
+          New Task
         </h1>
 
         <form
@@ -83,6 +109,78 @@ export default function NewTaskPage() {
               className="block text-sm font-medium mb-1.5"
               style={{ color: 'var(--text-secondary)' }}
             >
+              Frequency
+            </label>
+            <div className="flex gap-4 mb-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={repeatType === 'daily'}
+                  onChange={() => setRepeatType('daily')}
+                  className="accent-[var(--accent)]"
+                />
+                <span className="text-sm">Everyday</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={repeatType === 'weekly'}
+                  onChange={() => setRepeatType('weekly')}
+                  className="accent-[var(--accent)]"
+                />
+                <span className="text-sm">Specific Days</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={repeatType === 'once'}
+                  onChange={() => setRepeatType('once')}
+                  className="accent-[var(--accent)]"
+                />
+                <span className="text-sm">Once</span>
+              </label>
+            </div>
+
+            {repeatType === 'weekly' && (
+              <div className="flex justify-between mt-3">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((letter, i) => {
+                  const isSelected = repeatDays.includes(i);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleDay(i)}
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors cursor-pointer"
+                      style={{
+                        backgroundColor: isSelected ? 'var(--accent)' : 'var(--bg-raised)',
+                        color: isSelected ? '#fff' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {letter}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            
+            {repeatType === 'once' && (
+              <div className="mt-3">
+                <Input
+                  type="date"
+                  required
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]} // prevent past dates if desired
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label
+              className="block text-sm font-medium mb-1.5"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               Completion Points
             </label>
             <Input
@@ -94,7 +192,7 @@ export default function NewTaskPage() {
               onChange={(e) => setPoints(e.target.value)}
             />
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              Earn these points daily. Miss and lose half.
+              Earn these points per completion. Miss and lose half.
             </p>
           </div>
 

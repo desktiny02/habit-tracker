@@ -9,7 +9,7 @@ export interface UserData {
 }
 
 // Task Types
-export type RepeatType = 'daily';
+export type RepeatType = 'daily' | 'weekly' | 'once';
 
 export interface Task {
   id: string;
@@ -17,6 +17,8 @@ export interface Task {
   name: string;
   points: number;
   repeatType: RepeatType;
+  repeatDays?: number[]; // 0=Sun, 1=Mon... 6=Sat
+  targetDate?: string;   // YYYY-MM-DD
   createdAt: number;
 }
 

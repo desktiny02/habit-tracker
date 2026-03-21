@@ -18,9 +18,9 @@ export const isUsernameAvailable = async (username: string): Promise<{ available
   const normalized = normalizeUsername(username);
   if (normalized.length < 2) return { available: false, reason: 'Too short (min 2 chars)' };
   if (RESERVED_USERNAMES.has(normalized)) return { available: false, reason: 'Username is reserved' };
-  const q = query(collection(db, 'usernames'), where('username', '==', normalized));
-  const snap = await getDocs(q);
-  if (!snap.empty) return { available: false, reason: 'Already taken' };
+  const docRef = doc(db, 'usernames', normalized);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) return { available: false, reason: 'Already taken' };
   return { available: true };
 };
 
@@ -81,14 +81,15 @@ export const getUserTasks = async (userId: string) => {
 
 // Daily Logs & Points Logic
 export const logDailyTask = async (userId: string, taskId: string, status: LogStatus, taskPoints: number, date: string) => {
-  const logRef = doc(collection(db, 'logs'));
+  const logId = `${userId}_${taskId}_${date}`;
+  const logRef = doc(db, 'logs', logId);
   
   let pointsAwarded = 0;
   if (status === 'done') pointsAwarded = taskPoints;
   else if (status === 'missed') pointsAwarded = -Math.floor(taskPoints / 2);
 
   const newLog: DailyLog = {
-    id: logRef.id,
+    id: logId,
     userId,
     taskId,
     date,
@@ -97,12 +98,9 @@ export const logDailyTask = async (userId: string, taskId: string, status: LogSt
   };
 
   await runTransaction(db, async (transaction) => {
-    // 1. Ensure log doesn't already exist for this date + task to prevent duplicate
-    const q = query(collection(db, 'logs'), where('userId', '==', userId), where('taskId', '==', taskId), where('date', '==', date));
-    const existingLogs = await getDocs(q); // Note: getDocs isn't strictly transacted here, but suffices for basic check
-    if (!existingLogs.empty) throw new Error("Task already logged today.");
+    const existingLogSnap = await transaction.get(logRef);
+    if (existingLogSnap.exists()) throw new Error("Task already logged today.");
 
-    // 2. Read User Profile
     const userRef = doc(db, 'users', userId);
     const userSnap = await transaction.get(userRef);
     if (!userSnap.exists()) throw new Error("User not found.");
@@ -111,7 +109,6 @@ export const logDailyTask = async (userId: string, taskId: string, status: LogSt
     let newTotalPoints = (userData.totalPoints || 0) + pointsAwarded;
     if (newTotalPoints < 0) newTotalPoints = 0; // Prevent negative points
 
-    // 3. Write updates
     transaction.set(logRef, newLog);
     transaction.update(userRef, { totalPoints: newTotalPoints });
   });

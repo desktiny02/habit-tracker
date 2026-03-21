@@ -77,7 +77,19 @@ export default function DashboardPage() {
     }
   };
 
-  const pendingTasks = tasks.filter((t) => !logsToday.has(t.id));
+  const currentDay = new Date().getDay();
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  
+  const tasksForToday = tasks.filter(
+    (t) => 
+      t.repeatType === 'daily' || 
+      (t.repeatType === 'weekly' && t.repeatDays?.includes(currentDay)) ||
+      (t.repeatType === 'once' && t.targetDate === todayStr)
+  );
+
+  const pendingTasks = tasksForToday.filter(
+    (t) => !logsToday.has(t.id)
+  );
 
   return (
     <AppLayout>
@@ -157,12 +169,12 @@ export default function DashboardPage() {
                 border: '2px dashed var(--border-strong)',
               }}
             >
-              <div className="text-4xl mb-3">🎉</div>
+              <div className="text-4xl mb-3">{tasksForToday.length === 0 && tasks.length > 0 ? '☕' : '🎉'}</div>
               <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                All done for today!
+                {tasksForToday.length === 0 && tasks.length > 0 ? 'Rest day!' : 'All done for today!'}
               </h3>
               <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                No more pending tasks.
+                {tasksForToday.length === 0 && tasks.length > 0 ? 'No tasks scheduled for today.' : 'No more pending tasks.'}
               </p>
               {tasks.length === 0 && (
                 <Button onClick={() => router.push('/tasks/new')} className="mt-6">
