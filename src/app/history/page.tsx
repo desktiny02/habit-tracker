@@ -60,7 +60,6 @@ export default function HistoryPage() {
       const { status, pointsAwarded, taskName } = item.data;
       const isPositive = status === 'done';
       const isMissed = status === 'missed';
-      const isSkipped = status === 'skipped';
       
       let badgeColor = 'var(--text-muted)';
       let badgeText = 'Skipped';
@@ -75,7 +74,7 @@ export default function HistoryPage() {
       } else if (isMissed) {
         badgeColor = 'var(--danger)';
         badgeText = 'Missed';
-        pointsText = `-${Math.floor(pointsAwarded / 2)} pts`;
+        pointsText = `${pointsAwarded} pts`;
         pointsColor = 'var(--danger)';
       }
 

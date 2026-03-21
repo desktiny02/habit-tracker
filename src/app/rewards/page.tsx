@@ -71,41 +71,50 @@ export default function RewardsPage() {
     }
   };
 
+  const [confirmingCouponId, setConfirmingCouponId] = useState<string | null>(null);
+
   const handleUseCoupon = async (redemptionId: string) => {
-    if (confirm('Are you sure you want to use this coupon now?')) {
-      setUsingId(redemptionId);
-      try {
-        await useCoupon(redemptionId);
-        setRedemptions(prev => prev.map(r => r.id === redemptionId ? { ...r, status: 'used' } : r));
-        toast.success('Coupon used successfully!');
-      } catch (err: any) {
-        toast.error('Failed to use coupon');
-      } finally {
-        setUsingId(null);
-      }
+    if (confirmingCouponId !== redemptionId) {
+      setConfirmingCouponId(redemptionId);
+      return;
+    }
+    setUsingId(redemptionId);
+    setConfirmingCouponId(null);
+    try {
+      await useCoupon(redemptionId);
+      setRedemptions(prev => prev.map(r => r.id === redemptionId ? { ...r, status: 'used' } : r));
+      toast.success('Coupon used successfully!');
+    } catch {
+      toast.error('Failed to use coupon');
+    } finally {
+      setUsingId(null);
     }
   };
 
   const handleCreateReward = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const trimmedName = newRewardName.trim();
+    if (!trimmedName) return void toast.error('Reward name cannot be empty');
     const cost = parseInt(newRewardCost, 10);
     if (isNaN(cost) || cost <= 0) return void toast.error('Cost must be a positive number');
+    if (cost > 100000) return void toast.error('Cost cannot exceed 100,000');
 
     try {
       const docRef = await addDoc(collection(db, 'rewards'), {
         userId: user.uid,
-        name: newRewardName,
+        name: trimmedName,
         cost,
       });
-      const newReward: Reward = { id: docRef.id, userId: user.uid, name: newRewardName, cost };
+      const newReward: Reward = { id: docRef.id, userId: user.uid, name: trimmedName, cost };
       setRewards((prev) => [...prev, newReward]);
       setShowForm(false);
       setNewRewardName('');
       setNewRewardCost('');
       toast.success('Reward created!');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create reward');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create reward';
+      toast.error(msg);
     }
   };
 
@@ -252,6 +261,24 @@ export default function RewardsPage() {
                     <div className="text-sm font-medium text-center py-2" style={{ color: 'var(--text-muted)' }}>
                       Used
                     </div>
+                  ) : confirmingCouponId === red.id ? (
+                    <div className="flex gap-2">
+                      <Button 
+                        className="flex-1" 
+                        variant="secondary"
+                        onClick={() => setConfirmingCouponId(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        className="flex-1" 
+                        variant="danger"
+                        onClick={() => handleUseCoupon(red.id)}
+                        disabled={usingId === red.id}
+                      >
+                        {usingId === red.id ? 'Using...' : 'Confirm'}
+                      </Button>
+                    </div>
                   ) : (
                     <Button 
                       className="w-full" 
@@ -259,7 +286,7 @@ export default function RewardsPage() {
                       disabled={usingId === red.id}
                       variant="primary"
                     >
-                      {usingId === red.id ? 'Using...' : 'Use Coupon'}
+                      Use Coupon
                     </Button>
                   )}
                 </div>

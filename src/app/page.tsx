@@ -2,8 +2,8 @@
 
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
-import { useEffect, useState } from 'react';
-import { getUserTasks, logDailyTask } from '@/lib/firebase/firestore';
+import { useEffect, useState, useMemo } from 'react';
+import { getUserTasks, logDailyTask, deleteTask } from '@/lib/firebase/firestore';
 import { Task, LogStatus } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { Button } from '@/components/ui/button';
@@ -24,9 +24,11 @@ export default function DashboardPage() {
   const [totalPoints, setTotalPoints] = useState(0);
   const [streak, setStreak] = useState(0);
 
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const currentDay = useMemo(() => new Date().getDay(), []);
+
   useEffect(() => {
     if (!user) return;
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       if (snap.exists()) {
@@ -58,27 +60,34 @@ export default function DashboardPage() {
 
     loadData();
     return () => unsubscribeUser();
-  }, [user]);
+  }, [user, todayStr]);
 
   const handleAction = async (taskId: string, taskName: string, status: LogStatus, points: number) => {
     if (!user) return;
     setActionLoading(taskId);
     try {
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
       await logDailyTask(user.uid, taskId, taskName, status, points, todayStr);
       setLogsToday((prev) => new Set(prev).add(taskId));
       if (status === 'done')    toast.success(`+${points} pts — nice work!`);
       else if (status === 'missed') toast.error(`-${Math.floor(points / 2)} pts`);
       else toast(`Task skipped.`);
-    } catch (err: any) {
-      toast.error(err.message || 'Action failed');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Action failed';
+      toast.error(msg);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const currentDay = new Date().getDay();
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      toast.success('Task deleted');
+    } catch {
+      toast.error('Failed to delete task');
+    }
+  };
   
   const tasksForToday = tasks.filter(
     (t) => 
@@ -87,16 +96,14 @@ export default function DashboardPage() {
       (t.repeatType === 'once' && t.targetDate === todayStr)
   );
 
-  const pendingTasks = tasksForToday.filter(
-    (t) => !logsToday.has(t.id)
-  );
+  const pendingTasks = tasksForToday.filter((t) => !logsToday.has(t.id));
+  const completedTasks = tasksForToday.filter((t) => logsToday.has(t.id));
 
   return (
     <AppLayout>
       <div className="space-y-8">
         {/* ── Stats ───────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Points */}
           <div
             className="rounded-2xl p-5"
             style={{
@@ -109,7 +116,6 @@ export default function DashboardPage() {
             <p className="text-4xl font-bold mt-1 text-white tracking-tight">{totalPoints}</p>
           </div>
 
-          {/* Streak */}
           <div
             className="rounded-2xl p-5"
             style={{
@@ -157,6 +163,7 @@ export default function DashboardPage() {
                   key={task.id}
                   task={task}
                   onAction={handleAction}
+                  onDelete={handleDeleteTask}
                   isLoading={actionLoading === task.id}
                 />
               ))}
@@ -181,6 +188,39 @@ export default function DashboardPage() {
                   Create Your First Task
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* ── Completed Today ───────────────────────────── */}
+          {!loading && completedTasks.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+                Completed Today ({completedTasks.length})
+              </h3>
+              <div className="space-y-2">
+                {completedTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="rounded-xl p-3 flex items-center justify-between gap-3 opacity-60"
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--success)' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {task.name}
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: 'var(--success)' }}>
+                      +{task.points} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

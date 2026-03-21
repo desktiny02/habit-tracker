@@ -63,9 +63,15 @@ export const createUserProfile = async (uid: string, email: string, username: st
 
 // Tasks
 export const createTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {
+  const trimmedName = task.name.trim();
+  if (!trimmedName) throw new Error('Task name cannot be empty');
+  if (trimmedName.length > 100) throw new Error('Task name too long (max 100 chars)');
+  if (task.points > 1000) throw new Error('Points cannot exceed 1000');
+
   const taskRef = doc(collection(db, 'tasks'));
   const newTask: Task = {
     ...task,
+    name: trimmedName,
     id: taskRef.id,
     createdAt: Date.now()
   };
@@ -77,6 +83,12 @@ export const getUserTasks = async (userId: string) => {
   const q = query(collection(db, 'tasks'), where('userId', '==', userId));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data() as Task);
+};
+
+export const deleteTask = async (taskId: string) => {
+  const taskRef = doc(db, 'tasks', taskId);
+  const { deleteDoc } = await import('firebase/firestore');
+  await deleteDoc(taskRef);
 };
 
 // Daily Logs & Points Logic

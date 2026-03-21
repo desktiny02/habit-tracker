@@ -187,12 +187,13 @@ export default function NewTaskPage() {
               type="number"
               required
               min="1"
+              max="1000"
               placeholder="e.g. 50"
               value={points}
               onChange={(e) => setPoints(e.target.value)}
             />
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              Earn these points per completion. Miss and lose half.
+              1–1000 pts per completion. Miss and lose half.
             </p>
           </div>
 

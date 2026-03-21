@@ -184,7 +184,7 @@ export default function CalendarPage() {
                       let points = 0;
                       
                       if (isPositive) { badgeColor = 'var(--success)'; badgeText = 'Done'; points = log.pointsAwarded; }
-                      else if (isMissed) { badgeColor = 'var(--danger)'; badgeText = 'Missed'; points = -Math.floor(log.pointsAwarded / 2); }
+                      else if (isMissed) { badgeColor = 'var(--danger)'; badgeText = 'Missed'; points = log.pointsAwarded; }
 
                       return (
                         <div key={log.id} className="flex justify-between items-center bg-[var(--bg-raised)] p-3 rounded-lg">
