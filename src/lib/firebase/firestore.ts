@@ -126,13 +126,6 @@ export const logDailyTask = async (
   await runTransaction(db, async (transaction) => {
     const existingLogSnap = await transaction.get(logRef);
     if (existingLogSnap.exists()) {
-      // Allow overriding log if the user changes their mind. But wait, previously we threw an error.
-      // E.g. marking "not done" -> "done" might not be strictly allowed if we just overwrite.
-      // For now, let's just stick to the rule that it throws if already logged today.
-      // Wait, "Event items should show: tick (mark done), cross (mark not done), delete".
-      // They can just act once per day, or we can allow updating. 
-      // If we don't throw, we need to adjust points. Let's keep it throwing to avoid complexity, 
-      // as they have a 'delete' button for logs if we add it, or they can just log it once.
       throw new Error('Item already logged for this date.');
     }
 
@@ -161,7 +154,9 @@ export const autoMissPendingTasks = async (
 ): Promise<number> => {
   const dayOfWeek = new Date(date + 'T12:00:00').getDay();
 
+  // Only auto-miss TASKS — events have no points and should not be auto-missed
   const scheduledTasks = tasks.filter((t) => {
+    if (t.itemType === 'event') return false;
     if (t.repeatType === 'daily') return true;
     if (t.repeatType === 'weekly') return t.repeatDays?.includes(dayOfWeek) ?? false;
     if (t.repeatType === 'once') return t.targetDate === date;

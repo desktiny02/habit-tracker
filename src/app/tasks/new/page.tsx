@@ -166,7 +166,7 @@ export default function NewTaskPage() {
             <div>
               <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Required task</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Missing breaks your streak + 50% extra penalty
+                Missing a required task incurs 50% extra point penalty
               </p>
             </div>
             <button

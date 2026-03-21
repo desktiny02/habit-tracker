@@ -184,19 +184,51 @@ export default function DashboardPage() {
                 />
               ))}
             </div>
-          ) : (
+          ) : tasksForToday.length === 0 && tasks.length === 0 ? (
             <div
               className="rounded-2xl p-10 text-center"
               style={{ backgroundColor: 'var(--bg-surface)', border: '2px dashed var(--border-strong)' }}
             >
-              <div className="text-4xl mb-3">
-                {tasksForToday.length === 0 && tasks.length > 0 ? '☕' : '🎉'}
-              </div>
+              <div className="text-4xl mb-3">🚀</div>
               <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {tasksForToday.length === 0 && tasks.length > 0 ? 'Rest day!' : 'All done for today!'}
+                Get started!
+              </h3>
+              <p className="text-sm mt-1 mb-5" style={{ color: 'var(--text-secondary)' }}>
+                Create your first task or event to begin tracking.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={() => router.push('/tasks/new')} size="sm" className="gap-1">
+                  <Plus style={{ width: 14, height: 14 }} /> New Task
+                </Button>
+                <Button onClick={() => router.push('/events/new')} size="sm" variant="outline" className="gap-1">
+                  <Plus style={{ width: 14, height: 14 }} /> New Event
+                </Button>
+              </div>
+            </div>
+          ) : actedTasksWithLogs.length > 0 ? (
+            <div
+              className="rounded-2xl p-8 text-center"
+              style={{ backgroundColor: 'var(--bg-surface)', border: '2px dashed var(--border-strong)' }}
+            >
+              <div className="text-4xl mb-3">🎉</div>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                All done for today!
               </h3>
               <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                {tasksForToday.length === 0 && tasks.length > 0 ? 'No items scheduled.' : 'No more pending items.'}
+                Great job — all your items are logged.
+              </p>
+            </div>
+          ) : (
+            <div
+              className="rounded-2xl p-8 text-center"
+              style={{ backgroundColor: 'var(--bg-surface)', border: '2px dashed var(--border-strong)' }}
+            >
+              <div className="text-4xl mb-3">☕</div>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Rest day!
+              </h3>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                No items scheduled today.
               </p>
             </div>
           )}

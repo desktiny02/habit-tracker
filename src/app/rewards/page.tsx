@@ -41,7 +41,7 @@ export default function RewardsPage() {
         setRewards(rewSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Reward)));
         const loadedRedemptions = redSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Redemption));
         setRedemptions(loadedRedemptions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
         toast.error('Failed to load rewards');
       } finally {

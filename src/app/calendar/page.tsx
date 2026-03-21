@@ -29,24 +29,35 @@ export default function CalendarPage() {
   });
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => { setCurrentMonth(subMonths(currentMonth, 1)); setSelectedDay(null); };
+  const nextMonth = () => { setCurrentMonth(addMonths(currentMonth, 1)); setSelectedDay(null); };
 
+  // Fetch logs scoped to current month only (performance fix)
   useEffect(() => {
     if (!user) return;
+    setLoading(true);
+    const startStr = format(startOfWeek(monthStart), 'yyyy-MM-dd');
+    const endStr = format(endOfWeek(monthEnd), 'yyyy-MM-dd');
+
     const loadLogs = async () => {
       try {
-        const q = query(collection(db, 'logs'), where('userId', '==', user.uid));
+        const q = query(
+          collection(db, 'logs'),
+          where('userId', '==', user.uid),
+          where('date', '>=', startStr),
+          where('date', '<=', endStr)
+        );
         const snaps = await getDocs(q);
         setLogs(snaps.docs.map((d) => d.data() as DailyLog));
       } catch {
-        toast.error('Failed to load calendar logs');
+        toast.error('Failed to load calendar data');
       } finally {
         setLoading(false);
       }
     };
     loadLogs();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, currentMonth]);
 
   const getLogsForDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -172,31 +183,38 @@ export default function CalendarPage() {
                   {format(selectedDay, 'EEEE, MMMM d')}
                 </h3>
                 {getLogsForDay(selectedDay).length === 0 ? (
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No tasks logged on this day.</p>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No items logged on this day.</p>
                 ) : (
                   <div className="space-y-3">
                     {getLogsForDay(selectedDay).map(log => {
                       const isPositive = log.status === 'done';
                       const isMissed = log.status === 'missed';
+                      const isEvent = log.itemType === 'event';
                       
                       let badgeColor = 'var(--text-muted)';
                       let badgeText = 'Skipped';
-                      let points = 0;
                       
-                      if (isPositive) { badgeColor = 'var(--success)'; badgeText = 'Done'; points = log.pointsAwarded; }
-                      else if (isMissed) { badgeColor = 'var(--danger)'; badgeText = 'Missed'; points = log.pointsAwarded; }
+                      if (isPositive) { badgeColor = 'var(--success)'; badgeText = 'Done'; }
+                      else if (isMissed) { badgeColor = 'var(--danger)'; badgeText = 'Missed'; }
 
                       return (
                         <div key={log.id} className="flex justify-between items-center bg-[var(--bg-raised)] p-3 rounded-lg">
-                          <div className="flex items-center gap-3">
-                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: badgeColor }} />
-                             <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{log.taskName || 'Legacy Task'}</span>
+                          <div className="flex items-center gap-3 min-w-0">
+                             <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: badgeColor }} />
+                             <div className="min-w-0">
+                               <span className="font-medium text-sm block truncate" style={{ color: 'var(--text-primary)' }}>{log.taskName || 'Task'}</span>
+                               <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
+                                 {isEvent ? 'Event' : 'Task'}
+                               </span>
+                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 shrink-0">
                              <span className="text-xs font-bold px-2 py-1 rounded border" style={{ color: badgeColor, borderColor: badgeColor }}>{badgeText}</span>
-                             <span className="text-sm font-bold" style={{ color: isMissed ? 'var(--danger)' : isPositive ? 'var(--success)' : 'var(--text-muted)' }}>
-                               {points > 0 ? `+${points}` : points} pts
-                             </span>
+                             {!isEvent && (
+                               <span className="text-sm font-bold" style={{ color: isMissed ? 'var(--danger)' : isPositive ? 'var(--success)' : 'var(--text-muted)' }}>
+                                 {log.pointsAwarded > 0 ? `+${log.pointsAwarded}` : log.pointsAwarded} pts
+                               </span>
+                             )}
                           </div>
                         </div>
                       )

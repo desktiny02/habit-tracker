@@ -5,7 +5,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState } from 'react';
 import { DailyLog, Redemption } from '@/types';
 import { db } from '@/lib/firebase/config';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
@@ -32,13 +32,11 @@ export default function HistoryPage() {
         const qLogs = query(
           collection(db, 'logs'), 
           where('userId', '==', user.uid),
-          orderBy('createdAt', 'desc'),
           limit(fetchLimit + 1)
         );
         const qRedemptions = query(
           collection(db, 'redemptions'), 
           where('userId', '==', user.uid),
-          orderBy('date', 'desc'),
           limit(fetchLimit + 1)
         );
         
