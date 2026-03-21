@@ -21,19 +21,16 @@ export default function DashboardPage() {
   const [logsToday, setLogsToday] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  
   const [totalPoints, setTotalPoints] = useState(0);
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-    // Realtime points & streak listener
-    const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
+    const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
         setTotalPoints(data.totalPoints || 0);
         setStreak(data.streakCount || 0);
       }
@@ -42,26 +39,24 @@ export default function DashboardPage() {
     const loadData = async () => {
       try {
         const userTasks = await getUserTasks(user.uid);
-        
-        // Fetch logs for today
-        const qLogs = query(collection(db, 'logs'), where('userId', '==', user.uid), where('date', '==', todayStr));
+        const qLogs = query(
+          collection(db, 'logs'),
+          where('userId', '==', user.uid),
+          where('date', '==', todayStr)
+        );
         const logSnaps = await getDocs(qLogs);
         const loggedTaskIds = new Set<string>();
-        logSnaps.forEach(snap => {
-          loggedTaskIds.add(snap.data().taskId);
-        });
-
+        logSnaps.forEach((s) => loggedTaskIds.add(s.data().taskId));
         setTasks(userTasks);
         setLogsToday(loggedTaskIds);
-      } catch (err) {
-        toast.error("Failed to load dashboard");
+      } catch {
+        toast.error('Failed to load dashboard');
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-
     return () => unsubscribeUser();
   }, [user]);
 
@@ -71,10 +66,10 @@ export default function DashboardPage() {
     try {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       await logDailyTask(user.uid, taskId, status, points, todayStr);
-      setLogsToday(prev => new Set(prev).add(taskId));
-      if (status === 'done') toast.success(`Completed! +${points} points`);
-      else if (status === 'missed') toast.error(`Missed task. -${Math.floor(points / 2)} points`);
-      else toast.success(`Task skipped.`);
+      setLogsToday((prev) => new Set(prev).add(taskId));
+      if (status === 'done')    toast.success(`+${points} pts — nice work!`);
+      else if (status === 'missed') toast.error(`-${Math.floor(points / 2)} pts`);
+      else toast(`Task skipped.`);
     } catch (err: any) {
       toast.error(err.message || 'Action failed');
     } finally {
@@ -82,56 +77,97 @@ export default function DashboardPage() {
     }
   };
 
-  const pendingTasks = tasks.filter(t => !logsToday.has(t.id));
+  const pendingTasks = tasks.filter((t) => !logsToday.has(t.id));
 
   return (
     <AppLayout>
       <div className="space-y-8">
-        {/* Header Stats */}
+        {/* ── Stats ───────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200">
-            <h2 className="text-indigo-100 font-medium mb-1">Total Points</h2>
-            <p className="text-4xl font-bold tracking-tight">{totalPoints}</p>
+          {/* Points */}
+          <div
+            className="rounded-2xl p-5"
+            style={{
+              background: 'linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)',
+            }}
+          >
+            <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              Total Points
+            </p>
+            <p className="text-4xl font-bold mt-1 text-white tracking-tight">{totalPoints}</p>
           </div>
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-            <h2 className="text-slate-500 font-medium mb-1">Current Streak</h2>
-            <p className="text-4xl font-bold tracking-tight text-slate-800">{streak} <span className="text-2xl ml-1">🔥</span></p>
+
+          {/* Streak */}
+          <div
+            className="rounded-2xl p-5"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+              Streak
+            </p>
+            <p className="text-4xl font-bold mt-1 tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {streak} <span className="text-2xl">🔥</span>
+            </p>
           </div>
         </div>
 
-        {/* Tasks Section */}
+        {/* ── Tasks ───────────────────────────────────────── */}
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-slate-800">Today's Tasks</h2>
-            <Button onClick={() => router.push('/tasks/new')} size="sm" className="rounded-full shadow-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">
-              <Plus className="w-4 h-4 mr-1" /> Add Task
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              Today&apos;s Tasks
+            </h2>
+            <Button
+              onClick={() => router.push('/tasks/new')}
+              size="sm"
+              variant="outline"
+              className="gap-1"
+            >
+              <Plus style={{ width: 15, height: 15 }} />
+              New Task
             </Button>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-10">
-              <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-indigo-500 animate-spin"></div>
+            <div className="flex justify-center py-12">
+              <div
+                className="w-8 h-8 rounded-full border-[3px] animate-spin"
+                style={{ borderColor: 'var(--bg-raised)', borderTopColor: 'var(--accent)' }}
+              />
             </div>
           ) : pendingTasks.length > 0 ? (
             <div className="space-y-3">
-              {pendingTasks.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  onAction={handleAction} 
-                  isLoading={actionLoading === task.id} 
+              {pendingTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onAction={handleAction}
+                  isLoading={actionLoading === task.id}
                 />
               ))}
             </div>
           ) : (
-            <div className="bg-slate-100 rounded-3xl p-10 text-center border border-slate-200 border-dashed">
+            <div
+              className="rounded-2xl p-10 text-center"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                border: '2px dashed var(--border-strong)',
+              }}
+            >
               <div className="text-4xl mb-3">🎉</div>
-              <h3 className="text-lg font-semibold text-slate-700">You're all done!</h3>
-              <p className="text-slate-500 mt-1">No more pending tasks for today.</p>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                All done for today!
+              </h3>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                No more pending tasks.
+              </p>
               {tasks.length === 0 && (
-                 <Button onClick={() => router.push('/tasks/new')} className="mt-6">
-                 Create Your First Task
-               </Button>
+                <Button onClick={() => router.push('/tasks/new')} className="mt-6">
+                  Create Your First Task
+                </Button>
               )}
             </div>
           )}

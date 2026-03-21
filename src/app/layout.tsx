@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Habit Tracker",
-  description: "Track your habits, earn points, and redeem rewards.",
+  title: "Habit Tracker — Build Better Habits",
+  description: "Track your daily habits, earn points, and redeem rewards. A modern habit tracking app.",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
+      <body className="min-h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
         <AuthProvider>
           {children}
           <Toaster position="bottom-center" />

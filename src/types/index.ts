@@ -1,8 +1,11 @@
 // User Types
 export interface UserData {
   id: string;
+  email: string;
+  username: string;      // normalized lowercase, min 2 chars, unique
   totalPoints: number;
   streakCount: number;
+  createdAt: number;
 }
 
 // Task Types

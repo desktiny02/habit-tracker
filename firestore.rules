@@ -15,10 +15,19 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       allow read: if isOwner(userId);
-      // Only allow creation/updates if it's the user's own document
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
     }
+
+    // Usernames lookup Collection
+    // - Any authenticated user can read (required for real-time availability check)
+    // - Write is only allowed via server-side transaction from the owner's UID
+    match /usernames/{username} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
     
     // Tasks Collection
     match /tasks/{taskId} {

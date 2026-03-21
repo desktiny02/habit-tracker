@@ -18,8 +18,6 @@ export default function RewardsPage() {
   const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
-
-  // Form states
   const [showForm, setShowForm] = useState(false);
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardCost, setNewRewardCost] = useState('');
@@ -27,20 +25,17 @@ export default function RewardsPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Realtime points listener
-    const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        setTotalPoints(docSnap.data().totalPoints || 0);
-      }
+    const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) setTotalPoints(snap.data().totalPoints || 0);
     });
 
     const loadRewards = async () => {
       try {
         const q = query(collection(db, 'rewards'), where('userId', '==', user.uid));
         const snaps = await getDocs(q);
-        setRewards(snaps.docs.map(d => ({ ...d.data(), id: d.id } as Reward)));
-      } catch (err) {
-        toast.error("Failed to load rewards");
+        setRewards(snaps.docs.map((d) => ({ ...d.data(), id: d.id } as Reward)));
+      } catch {
+        toast.error('Failed to load rewards');
       } finally {
         setLoading(false);
       }
@@ -55,7 +50,7 @@ export default function RewardsPage() {
     setRedeemingId(reward.id);
     try {
       await redeemReward(user.uid, reward);
-      toast.success(`Redeemed ${reward.name}!`);
+      toast.success(`Redeemed "${reward.name}"!`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to redeem');
     } finally {
@@ -67,87 +62,130 @@ export default function RewardsPage() {
     e.preventDefault();
     if (!user) return;
     const cost = parseInt(newRewardCost, 10);
-    if (isNaN(cost) || cost <= 0) return toast.error("Cost must be a positive number");
-    
+    if (isNaN(cost) || cost <= 0) return void toast.error('Cost must be a positive number');
+
     try {
       const docRef = await addDoc(collection(db, 'rewards'), {
         userId: user.uid,
         name: newRewardName,
-        cost
+        cost,
       });
       const newReward: Reward = { id: docRef.id, userId: user.uid, name: newRewardName, cost };
-      setRewards(prev => [...prev, newReward]);
+      setRewards((prev) => [...prev, newReward]);
       setShowForm(false);
       setNewRewardName('');
       setNewRewardCost('');
-      toast.success("Reward created!");
+      toast.success('Reward created!');
     } catch (err: any) {
-      toast.error(err.message || "Failed to create reward");
+      toast.error(err.message || 'Failed to create reward');
     }
   };
 
   return (
     <AppLayout>
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-500 to-indigo-600 text-transparent bg-clip-text">Rewards</h1>
-          <p className="text-slate-500 mt-1 font-medium">Available Points: <span className="text-indigo-600 font-bold text-lg">{totalPoints}</span></p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            Rewards
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Available:{' '}
+            <span className="font-bold" style={{ color: 'var(--accent)' }}>
+              {totalPoints} pts
+            </span>
+          </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} variant={showForm ? 'secondary' : 'primary'} className="rounded-full shadow-md font-semibold">
+        <Button
+          onClick={() => setShowForm(!showForm)}
+          variant={showForm ? 'secondary' : 'primary'}
+        >
           {showForm ? 'Cancel' : 'New Reward'}
         </Button>
       </div>
 
+      {/* Create form */}
       {showForm && (
-        <form onSubmit={handleCreateReward} className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 mb-8 flex flex-col md:flex-row gap-4 items-end transition-all">
-          <div className="flex-1 w-full relative">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Reward Name</label>
-            <Input 
-              type="text" 
+        <form
+          onSubmit={handleCreateReward}
+          className="rounded-2xl p-5 mb-8 flex flex-col md:flex-row gap-4 items-end"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div className="flex-1 w-full">
+            <label
+              className="block text-sm font-medium mb-1.5"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Reward Name
+            </label>
+            <Input
+              type="text"
               required
               placeholder="e.g. Treat myself to ice cream"
               value={newRewardName}
-              onChange={e => setNewRewardName(e.target.value)}
-              className="bg-slate-50 border-slate-200"
+              onChange={(e) => setNewRewardName(e.target.value)}
             />
           </div>
-          <div className="w-full md:w-32 relative">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Cost (pts)</label>
-            <Input 
-              type="number" 
+          <div className="w-full md:w-32">
+            <label
+              className="block text-sm font-medium mb-1.5"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Cost (pts)
+            </label>
+            <Input
+              type="number"
               required
               min="1"
               placeholder="100"
               value={newRewardCost}
-              onChange={e => setNewRewardCost(e.target.value)}
-              className="bg-slate-50 border-slate-200"
+              onChange={(e) => setNewRewardCost(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full md:w-auto h-11 px-8 shadow-sm font-semibold">Save</Button>
+          <Button type="submit" className="w-full md:w-auto h-11 px-8">
+            Save
+          </Button>
         </form>
       )}
 
+      {/* List */}
       {loading ? (
-        <div className="flex justify-center py-10">
-          <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-indigo-500 animate-spin"></div>
+        <div className="flex justify-center py-12">
+          <div
+            className="w-8 h-8 rounded-full border-[3px] animate-spin"
+            style={{ borderColor: 'var(--bg-raised)', borderTopColor: 'var(--accent)' }}
+          />
         </div>
       ) : rewards.length === 0 ? (
-        <div className="bg-slate-50 rounded-3xl p-10 text-center border-2 border-dashed border-slate-200">
+        <div
+          className="rounded-2xl p-12 text-center"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            border: '2px dashed var(--border-strong)',
+          }}
+        >
           <div className="text-4xl mb-3">🎁</div>
-          <h3 className="text-lg font-semibold text-slate-700">No rewards yet</h3>
-          <p className="text-slate-500 mt-1">Create some rewards to treat yourself for your hard work!</p>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            No rewards yet
+          </h3>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Create rewards to treat yourself for your hard work!
+          </p>
           <Button onClick={() => setShowForm(true)} className="mt-6" variant="outline">
             Create First Reward
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {rewards.map(reward => (
-            <RewardCard 
-              key={reward.id} 
-              reward={reward} 
-              userPoints={totalPoints} 
-              onRedeem={handleRedeem} 
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rewards.map((reward) => (
+            <RewardCard
+              key={reward.id}
+              reward={reward}
+              userPoints={totalPoints}
+              onRedeem={handleRedeem}
               isLoading={redeemingId === reward.id}
             />
           ))}

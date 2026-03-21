@@ -11,45 +11,62 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onAction, isLoading }: TaskCardProps) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between gap-4 transition-all hover:shadow-md">
-      <div>
-        <h3 className="font-semibold text-slate-800 text-lg">{task.name}</h3>
-        <p className="text-slate-500 text-sm flex items-center gap-1 mt-1">
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+    <div
+      className="rounded-2xl p-4 flex items-center justify-between gap-4 transition-all"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div className="min-w-0">
+        <h3
+          className="font-semibold text-base leading-snug truncate"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          {task.name}
+        </h3>
+        <p className="text-sm mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{ backgroundColor: 'var(--warning)' }}
+          />
           {task.points} pts
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <Button 
-          variant="secondary" 
-          size="sm" 
+
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Skip */}
+        <button
           onClick={() => onAction(task.id, 'skipped', task.points)}
           disabled={isLoading}
-          className="text-slate-500 hover:text-slate-700 h-10 w-10 p-0 rounded-full"
           title="Skip"
+          className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
+          style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-muted)' }}
         >
-          <SkipForward className="w-5 h-5" />
-        </Button>
-        <Button 
-          variant="danger" 
-          size="sm" 
+          <SkipForward style={{ width: 16, height: 16 }} />
+        </button>
+
+        {/* Miss */}
+        <button
           onClick={() => onAction(task.id, 'missed', task.points)}
           disabled={isLoading}
-          className="h-10 w-10 p-0 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 border-none shadow-none"
-          title="Miss"
+          title="Mark as missed"
+          className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
+          style={{ backgroundColor: 'rgba(248,113,113,0.12)', color: 'var(--danger)' }}
         >
-          <X className="w-5 h-5" />
-        </Button>
-        <Button 
-          variant="primary" 
-          size="sm" 
+          <X style={{ width: 16, height: 16 }} />
+        </button>
+
+        {/* Done */}
+        <button
           onClick={() => onAction(task.id, 'done', task.points)}
           disabled={isLoading}
-          className="h-12 w-12 p-0 rounded-full bg-indigo-500 hover:bg-indigo-600 shadow-indigo-200 shadow-lg"
-          title="Complete"
+          title="Mark as done"
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 disabled:opacity-40 shadow-md"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
         >
-          <Check className="w-6 h-6" />
-        </Button>
+          <Check style={{ width: 18, height: 18 }} />
+        </button>
       </div>
     </div>
   );

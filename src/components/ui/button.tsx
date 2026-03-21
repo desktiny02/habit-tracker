@@ -7,27 +7,63 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
+  ({ className, variant = 'primary', size = 'md', style, ...props }, ref) => {
+    // Build inline style per variant to respect CSS variables
+    const variantStyle: React.CSSProperties = (() => {
+      switch (variant) {
+        case 'primary':
+          return {
+            backgroundColor: 'var(--accent)',
+            color: '#fff',
+          };
+        case 'secondary':
+          return {
+            backgroundColor: 'var(--bg-raised)',
+            color: 'var(--text-primary)',
+          };
+        case 'outline':
+          return {
+            backgroundColor: 'transparent',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
+          };
+        case 'ghost':
+          return {
+            backgroundColor: 'transparent',
+            color: 'var(--text-secondary)',
+          };
+        case 'danger':
+          return {
+            backgroundColor: '#ef4444',
+            color: '#fff',
+          };
+        default:
+          return {};
+      }
+    })();
+
     return (
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-50",
+          'inline-flex items-center justify-center rounded-xl font-medium transition-all duration-150',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+          'disabled:pointer-events-none disabled:opacity-50',
+          'active:scale-[0.97]',
+          // Hover handled via opacity tweak — works across all variants
+          'hover:opacity-90',
           {
-            'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-sm': variant === 'primary',
-            'bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-95': variant === 'secondary',
-            'border border-slate-200 bg-transparent text-slate-700 hover:bg-slate-50 active:scale-95': variant === 'outline',
-            'hover:bg-slate-100 text-slate-700': variant === 'ghost',
-            'bg-rose-500 text-white hover:bg-rose-600 active:scale-95 shadow-sm': variant === 'danger',
+            'shadow-sm': variant === 'primary' || variant === 'danger',
             'h-9 px-4 text-sm': size === 'sm',
-            'h-11 px-6 text-base': size === 'md',
-            'h-14 px-8 text-lg rounded-2xl': size === 'lg',
+            'h-11 px-5 text-sm': size === 'md',
+            'h-12 px-7 text-base rounded-2xl': size === 'lg',
           },
           className
         )}
+        style={{ ...variantStyle, ...style }}
         {...props}
       />
     );
   }
 );
-Button.displayName = "Button";
+Button.displayName = 'Button';

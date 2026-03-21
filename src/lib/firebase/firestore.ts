@@ -1,6 +1,65 @@
 import { db } from './config';
 import { collection, doc, setDoc, getDoc, getDocs, query, where, updateDoc, writeBatch, runTransaction } from 'firebase/firestore';
-import { Task, DailyLog, LogStatus, Reward, Redemption } from '@/types';
+import { Task, DailyLog, LogStatus, Reward, Redemption, UserData } from '@/types';
+
+// ── Reserved usernames ────────────────────────────────────────────
+const RESERVED_USERNAMES = new Set(['admin', 'support', 'system', 'moderator', 'root', 'api', 'help', 'info', 'contact', 'security']);
+
+/**
+ * Normalize a username: lowercase, trim, strip disallowed chars.
+ */
+export const normalizeUsername = (raw: string): string =>
+  raw.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+
+/**
+ * Check if a username is already taken. Returns true if available.
+ */
+export const isUsernameAvailable = async (username: string): Promise<{ available: boolean; reason?: string }> => {
+  const normalized = normalizeUsername(username);
+  if (normalized.length < 2) return { available: false, reason: 'Too short (min 2 chars)' };
+  if (RESERVED_USERNAMES.has(normalized)) return { available: false, reason: 'Username is reserved' };
+  const q = query(collection(db, 'usernames'), where('username', '==', normalized));
+  const snap = await getDocs(q);
+  if (!snap.empty) return { available: false, reason: 'Already taken' };
+  return { available: true };
+};
+
+/**
+ * Given a username, return the stored email for Firebase Auth sign-in.
+ * Returns null if not found.
+ */
+export const lookupEmailByUsername = async (username: string): Promise<string | null> => {
+  const normalized = normalizeUsername(username);
+  const docRef = doc(db, 'usernames', normalized);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return null;
+  return snap.data().email as string;
+};
+
+/**
+ * Create the user profile document and the username lookup document.
+ */
+export const createUserProfile = async (uid: string, email: string, username: string): Promise<void> => {
+  const normalized = normalizeUsername(username);
+  const userRef = doc(db, 'users', uid);
+  const usernameRef = doc(db, 'usernames', normalized);
+
+  await runTransaction(db, async (tx) => {
+    const usernameSnap = await tx.get(usernameRef);
+    if (usernameSnap.exists()) throw new Error('Username was taken by another user — please choose a different one.');
+
+    const profile: UserData = {
+      id: uid,
+      email,
+      username: normalized,
+      totalPoints: 0,
+      streakCount: 0,
+      createdAt: Date.now(),
+    };
+    tx.set(userRef, profile);
+    tx.set(usernameRef, { uid, email, username: normalized });
+  });
+};
 
 // Tasks
 export const createTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {

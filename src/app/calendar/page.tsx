@@ -6,7 +6,10 @@ import { useEffect, useState } from 'react';
 import { DailyLog } from '@/types';
 import { db } from '@/lib/firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, startOfWeek, endOfWeek, isToday } from 'date-fns';
+import {
+  startOfMonth, endOfMonth, eachDayOfInterval, format,
+  startOfWeek, endOfWeek, isToday,
+} from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function CalendarPage() {
@@ -14,118 +17,139 @@ export default function CalendarPage() {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Use current month
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
-  const calendarStart = startOfWeek(monthStart);
-  const calendarEnd = endOfWeek(monthEnd);
-
-  const gridDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  const gridDays = eachDayOfInterval({
+    start: startOfWeek(monthStart),
+    end: endOfWeek(monthEnd),
+  });
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   useEffect(() => {
     if (!user) return;
-
     const loadLogs = async () => {
       try {
-        const startStr = format(monthStart, 'yyyy-MM-dd');
-        const endStr = format(monthEnd, 'yyyy-MM-dd');
-
-        // Fetch logs for the current user. Since we need to query by date range, 
-        // we can fetch all logs for now or implement a broad range query.
-        // For simplicity in this demo, let's fetch all user logs and filter locally if dataset isn't huge.
         const q = query(collection(db, 'logs'), where('userId', '==', user.uid));
         const snaps = await getDocs(q);
-        const fetchedLogs = snaps.docs.map(doc => doc.data() as DailyLog);
-        setLogs(fetchedLogs);
-      } catch (err) {
-        toast.error("Failed to load calendar logs");
+        setLogs(snaps.docs.map((d) => d.data() as DailyLog));
+      } catch {
+        toast.error('Failed to load calendar logs');
       } finally {
         setLoading(false);
       }
     };
     loadLogs();
-  }, [user, monthStart, monthEnd]);
+  }, [user]);
 
   const getLogsForDay = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    return logs.filter(log => log.date === dateStr);
+    return logs.filter((l) => l.date === dateStr);
   };
 
   return (
     <AppLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800">History</h1>
-        <p className="text-slate-500 mt-1 font-medium">{format(today, 'MMMM yyyy')}</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          History
+        </h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+          {format(today, 'MMMM yyyy')}
+        </p>
       </div>
 
-      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
+      <div
+        className="rounded-2xl p-5 sm:p-7"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+        }}
+      >
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-indigo-500 animate-spin"></div>
+          <div className="flex justify-center py-16">
+            <div
+              className="w-8 h-8 rounded-full border-[3px] animate-spin"
+              style={{ borderColor: 'var(--bg-raised)', borderTopColor: 'var(--accent)' }}
+            />
           </div>
         ) : (
-          <div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-4 mb-2">
-              {weekDays.map(day => (
-                <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  {day}
+          <>
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {weekDays.map((d) => (
+                <div
+                  key={d}
+                  className="text-center text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {d}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-4">
-              {gridDays.map(day => {
+
+            {/* Days grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {gridDays.map((day) => {
                 const dayLogs = getLogsForDay(day);
                 const isCurrentMonth = day.getMonth() === today.getMonth();
                 const isCurrentDay = isToday(day);
-                
+
                 return (
-                  <div 
-                    key={day.toISOString()} 
-                    className={`aspect-square p-1 sm:p-2 rounded-xl border flex flex-col items-center justify-between transition-colors
-                      ${isCurrentMonth ? 'bg-white border-slate-200' : 'bg-slate-50 text-slate-400 border-slate-100'}
-                      ${isCurrentDay ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
-                      hover:bg-slate-50 cursor-default
-                    `}
+                  <div
+                    key={day.toISOString()}
+                    className="aspect-square p-1 rounded-xl flex flex-col items-center justify-between transition-colors cursor-default"
+                    style={{
+                      backgroundColor: isCurrentMonth ? 'var(--bg-raised)' : 'transparent',
+                      opacity: isCurrentMonth ? 1 : 0.35,
+                      outline: isCurrentDay ? '2px solid var(--accent)' : 'none',
+                      outlineOffset: '1px',
+                    }}
                   >
-                    <span className={`text-xs sm:text-sm font-medium ${isCurrentDay ? 'text-indigo-600' : ''}`}>
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: isCurrentDay ? 'var(--accent)' : 'var(--text-secondary)' }}
+                    >
                       {format(day, 'd')}
                     </span>
-                    <div className="flex flex-wrap gap-1 justify-center mt-1">
-                      {dayLogs.map(log => {
-                        let dotColor = 'bg-slate-200';
-                        if (log.status === 'done') dotColor = 'bg-emerald-400';
-                        if (log.status === 'missed') dotColor = 'bg-rose-400';
-                        if (log.status === 'skipped') dotColor = 'bg-slate-300';
-                        
+                    <div className="flex flex-wrap gap-0.5 justify-center">
+                      {dayLogs.map((log) => {
+                        const color =
+                          log.status === 'done'   ? 'var(--success)' :
+                          log.status === 'missed' ? 'var(--danger)'  :
+                          'var(--text-muted)';
                         return (
-                          <div 
-                            key={log.id} 
-                            className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${dotColor}`}
+                          <span
+                            key={log.id}
                             title={log.status}
+                            style={{
+                              display: 'inline-block',
+                              width: 6, height: 6,
+                              borderRadius: '99px',
+                              backgroundColor: color,
+                            }}
                           />
-                        )
+                        );
                       })}
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
-            
+
             {/* Legend */}
-            <div className="mt-8 flex items-center justify-center gap-6 text-sm text-slate-500">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-emerald-400" /> Done
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-rose-400" /> Missed
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-slate-300" /> Skipped
-              </div>
+            <div className="mt-6 flex items-center justify-center gap-6 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {[
+                { label: 'Done',    color: 'var(--success)' },
+                { label: 'Missed',  color: 'var(--danger)'  },
+                { label: 'Skipped', color: 'var(--text-muted)' },
+              ].map(({ label, color }) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '99px', backgroundColor: color }} />
+                  {label}
+                </div>
+              ))}
             </div>
-          </div>
+          </>
         )}
       </div>
     </AppLayout>
