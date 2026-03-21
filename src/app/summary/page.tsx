@@ -21,7 +21,6 @@ interface WeekStats {
 export default function SummaryPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<WeekStats | null>(null);
-  const [streak, setStreak] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +33,6 @@ export default function SummaryPage() {
     const unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       if (snap.exists()) {
         const d = snap.data() as UserData;
-        setStreak(d.streakCount || 0);
         setTotalPoints(d.totalPoints || 0);
       }
     });
@@ -54,6 +52,8 @@ export default function SummaryPage() {
         let pointsEarned = 0, pointsLost = 0;
 
         for (const log of logs) {
+          if (log.itemType === 'event') continue; // exclude events from task breakdown
+          
           if (log.status === 'done') { totalDone++; pointsEarned += log.pointsAwarded; }
           else if (log.status === 'missed') { totalMissed++; pointsLost += Math.abs(log.pointsAwarded); }
           else { totalSkipped++; }
@@ -155,12 +155,12 @@ export default function SummaryPage() {
             </div>
           </div>
 
-          {/* Streak + Total */}
+          {/* Points Overview */}
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Current Streak</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Total Points</p>
               <p className="text-3xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
-                {streak} 🔥
+                {totalPoints} 🌟
               </p>
             </div>
             <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>

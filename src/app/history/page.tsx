@@ -5,9 +5,10 @@ import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState } from 'react';
 import { DailyLog, Redemption } from '@/types';
 import { db } from '@/lib/firebase/config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
 
 type ActivityItem = 
   | { type: 'log'; data: DailyLog; timestamp: number }
@@ -17,33 +18,46 @@ export default function HistoryPage() {
   const { user } = useAuth();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
     const loadHistory = async () => {
+      setLoading(true);
       try {
-        const qLogs = query(collection(db, 'logs'), where('userId', '==', user.uid));
-        const qRedemptions = query(collection(db, 'redemptions'), where('userId', '==', user.uid));
+        const fetchLimit = page * 15;
+        // since we combine 2 collections and sort locally, we fetch fetchLimit from both
+        const qLogs = query(
+          collection(db, 'logs'), 
+          where('userId', '==', user.uid),
+          orderBy('createdAt', 'desc'),
+          limit(fetchLimit + 1)
+        );
+        const qRedemptions = query(
+          collection(db, 'redemptions'), 
+          where('userId', '==', user.uid),
+          orderBy('date', 'desc'),
+          limit(fetchLimit + 1)
+        );
         
         const [logSnaps, redSnaps] = await Promise.all([getDocs(qLogs), getDocs(qRedemptions)]);
         
         const logs: ActivityItem[] = logSnaps.docs.map(d => {
           const data = d.data() as DailyLog;
-          // logs use YYYY-MM-DD for date, which doesn't have time.
-          // To make it sortable, we can parse it, or rely on another timestamp if we had one.
-          // Let's use the date string to create a timestamp.
-          return { type: 'log', data, timestamp: new Date(data.date).getTime() };
+          return { type: 'log', data, timestamp: data.createdAt || new Date(data.date).getTime() };
         });
 
         const redemptions: ActivityItem[] = redSnaps.docs.map(d => {
           const data = d.data() as Redemption;
-          // redemptions use ISO string `date`
           return { type: 'redemption', data, timestamp: new Date(data.date).getTime() };
         });
 
         const combined = [...logs, ...redemptions].sort((a, b) => b.timestamp - a.timestamp);
-        setActivities(combined);
+        
+        setHasMore(combined.length > fetchLimit);
+        setActivities(combined.slice(0, fetchLimit));
       } catch (err) {
         toast.error('Failed to load history');
         console.error(err);
@@ -53,49 +67,56 @@ export default function HistoryPage() {
     };
 
     loadHistory();
-  }, [user]);
+  }, [user, page]);
 
   const renderActivity = (item: ActivityItem) => {
     if (item.type === 'log') {
-      const { status, pointsAwarded, taskName } = item.data;
+      const { status, pointsAwarded, taskName, itemType } = item.data;
+      const isEvent = itemType === 'event';
       const isPositive = status === 'done';
       const isMissed = status === 'missed';
       
       let badgeColor = 'var(--text-muted)';
-      let badgeText = 'Skipped';
+      let badgeText = isEvent ? 'Event Skipped' : 'Task Skipped';
       let pointsText = '0 pts';
       let pointsColor = 'var(--text-muted)';
       
       if (isPositive) {
         badgeColor = 'var(--success)';
-        badgeText = 'Done';
+        badgeText = isEvent ? 'Event Done' : 'Task Done';
         pointsText = `+${pointsAwarded} pts`;
         pointsColor = 'var(--success)';
       } else if (isMissed) {
         badgeColor = 'var(--danger)';
-        badgeText = 'Missed';
+        badgeText = isEvent ? 'Event Missed' : 'Task Missed';
         pointsText = `${pointsAwarded} pts`;
         pointsColor = 'var(--danger)';
       }
 
+      if (isEvent) {
+        pointsText = '';
+      }
+
       return (
-        <div className="flex items-center justify-between p-4 rounded-xl border mb-3" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+        <div key={`${item.type}-${item.data.id}`} className="flex items-center justify-between p-4 rounded-xl border mb-3" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${badgeColor}20`, color: badgeColor }}>
-                Task {badgeText}
+                {badgeText}
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                 {taskName || 'Legacy Task'}
               </span>
             </div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {format(item.timestamp, 'MMM d, yyyy')}
+              {format(item.timestamp, 'MMM d, yyyy h:mm a')}
             </p>
           </div>
-          <div className="font-bold whitespace-nowrap" style={{ color: pointsColor }}>
-            {pointsText}
-          </div>
+          {!isEvent && (
+            <div className="font-bold whitespace-nowrap" style={{ color: pointsColor }}>
+              {pointsText}
+            </div>
+          )}
         </div>
       );
     } else {
@@ -103,7 +124,7 @@ export default function HistoryPage() {
       const isUsed = status === 'used';
 
       return (
-        <div className="flex items-center justify-between p-4 rounded-xl border mb-3" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+        <div key={`${item.type}-${item.data.id}`} className="flex items-center justify-between p-4 rounded-xl border mb-3" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)' }}>
@@ -114,7 +135,7 @@ export default function HistoryPage() {
               </span>
             </div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {format(item.timestamp, 'MMM d, yyyy')}
+              {format(item.timestamp, 'MMM d, yyyy h:mm a')}
             </p>
           </div>
           <div className="font-bold whitespace-nowrap" style={{ color: 'var(--danger)' }}>
@@ -132,7 +153,7 @@ export default function HistoryPage() {
           Activity History
         </h1>
 
-        {loading ? (
+        {loading && activities.length === 0 ? (
           <div className="flex justify-center py-12">
             <div
               className="w-8 h-8 rounded-full border-[3px] animate-spin"
@@ -145,11 +166,22 @@ export default function HistoryPage() {
           </div>
         ) : (
           <div>
-            {activities.map((item, idx) => (
-              <div key={idx}>
-                {renderActivity(item)}
+            {activities.map((item) => renderActivity(item))}
+            {hasMore ? (
+              <div className="flex justify-center mt-6">
+                <Button 
+                  onClick={() => setPage(p => p + 1)} 
+                  variant="secondary"
+                  disabled={loading}
+                >
+                  {loading ? 'Loading...' : 'Load More'}
+                </Button>
               </div>
-            ))}
+            ) : (
+               <div className="text-center py-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+                 No more activities.
+               </div>
+            )}
           </div>
         )}
       </div>

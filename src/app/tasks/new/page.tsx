@@ -51,6 +51,7 @@ export default function NewTaskPage() {
     try {
       await createTask({
         userId: user.uid,
+        itemType: 'task',
         name,
         description,
         points: pts,

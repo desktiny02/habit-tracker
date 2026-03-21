@@ -1,7 +1,6 @@
 import { db } from './config';
 import { collection, doc, setDoc, getDoc, getDocs, query, where, updateDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { Task, DailyLog, LogStatus, Reward, Redemption, UserData, PRIORITY_CONFIG } from '@/types';
-import { format, subDays, startOfWeek, addWeeks } from 'date-fns';
 
 // ── Reserved usernames ────────────────────────────────────────────
 const RESERVED_USERNAMES = new Set(['admin', 'support', 'system', 'moderator', 'root', 'api', 'help', 'info', 'contact', 'security']);
@@ -31,10 +30,6 @@ export const createUserProfile = async (uid: string, email: string, username: st
   const userRef = doc(db, 'users', uid);
   const usernameRef = doc(db, 'usernames', normalized);
 
-  // Calculate next Monday for skip token reset
-  const now = new Date();
-  const nextMonday = format(addWeeks(startOfWeek(now, { weekStartsOn: 1 }), 1), 'yyyy-MM-dd');
-
   await runTransaction(db, async (tx) => {
     const usernameSnap = await tx.get(usernameRef);
     if (usernameSnap.exists()) throw new Error('Username was taken — please choose a different one.');
@@ -44,9 +39,6 @@ export const createUserProfile = async (uid: string, email: string, username: st
       email,
       username: normalized,
       totalPoints: 0,
-      streakCount: 0,
-      skipTokens: 3,
-      skipTokensResetAt: nextMonday,
       createdAt: Date.now(),
     };
     tx.set(userRef, profile);
@@ -54,28 +46,11 @@ export const createUserProfile = async (uid: string, email: string, username: st
   });
 };
 
-// ── Skip token reset check ──────────────────────────────────────
-export const checkAndResetSkipTokens = async (userId: string): Promise<void> => {
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const userRef = doc(db, 'users', userId);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(userRef);
-    if (!snap.exists()) return;
-    const data = snap.data() as UserData;
-
-    if (todayStr >= (data.skipTokensResetAt || '')) {
-      const nextMonday = format(addWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1), 'yyyy-MM-dd');
-      tx.update(userRef, { skipTokens: 3, skipTokensResetAt: nextMonday });
-    }
-  });
-};
-
-// ── Tasks ────────────────────────────────────────────────────────
+// ── Tasks / Events ────────────────────────────────────────────────────────
 export const createTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {
   const trimmedName = task.name.trim();
-  if (!trimmedName) throw new Error('Task name cannot be empty');
-  if (trimmedName.length > 100) throw new Error('Task name too long (max 100 chars)');
+  if (!trimmedName) throw new Error('Item name cannot be empty');
+  if (trimmedName.length > 100) throw new Error('Item name too long (max 100 chars)');
   if (task.points > 1000) throw new Error('Points cannot exceed 1000');
 
   const taskRef = doc(collection(db, 'tasks'));
@@ -101,12 +76,20 @@ export const deleteTask = async (taskId: string) => {
   await deleteDoc(doc(db, 'tasks', taskId));
 };
 
+// Cancel an event/task. If recurring, we might want to delete it or disable it.
+// The user says "If recurring task is cancelled -> must NOT appear from that day onward".
+// "If future task/event is cancelled -> removed from all views"
+// Since recurring tasks don't currently have a cancel date, we can either set a `endDate` 
+// or simply delete the task if we want it fully removed. The prompt says "removed from all views".
+// Let's implement real deletion for tasks.
+export const cancelRecurringTask = deleteTask;
+
 // ── Penalty helper ──────────────────────────────────────────────
-const calcPenalty = (task: { points: number; priority?: string; required?: boolean }): number => {
+const calcPenalty = (task: { points: number; priority?: string; required?: boolean; itemType?: string }): number => {
+  if (task.itemType === 'event') return 0;
   const pri = (task.priority || 'medium') as keyof typeof PRIORITY_CONFIG;
   const multiplier = PRIORITY_CONFIG[pri]?.missMultiplier ?? 0.5;
-  const base = Math.floor(task.points * multiplier);
-  // Required tasks get 50% extra penalty
+  const base = Math.floor((task.points || 0) * multiplier);
   return task.required ? Math.floor(base * 1.5) : base;
 };
 
@@ -123,15 +106,35 @@ export const logDailyTask = async (
   const logRef = doc(db, 'logs', logId);
 
   let pointsAwarded = 0;
-  if (status === 'done') pointsAwarded = task.points;
-  else if (status === 'missed') pointsAwarded = -calcPenalty(task);
-  // skipped = 0 pts but costs a token
+  if (task.itemType !== 'event') {
+    if (status === 'done') pointsAwarded = task.points;
+    else if (status === 'missed') pointsAwarded = -calcPenalty(task);
+  }
 
-  const newLog: DailyLog = { id: logId, userId, taskId, taskName, date, status, pointsAwarded };
+  const newLog: DailyLog = { 
+    id: logId, 
+    userId, 
+    taskId, 
+    taskName, 
+    itemType: task.itemType,
+    date, 
+    status, 
+    pointsAwarded,
+    createdAt: Date.now() 
+  };
 
   await runTransaction(db, async (transaction) => {
     const existingLogSnap = await transaction.get(logRef);
-    if (existingLogSnap.exists()) throw new Error('Task already logged today.');
+    if (existingLogSnap.exists()) {
+      // Allow overriding log if the user changes their mind. But wait, previously we threw an error.
+      // E.g. marking "not done" -> "done" might not be strictly allowed if we just overwrite.
+      // For now, let's just stick to the rule that it throws if already logged today.
+      // Wait, "Event items should show: tick (mark done), cross (mark not done), delete".
+      // They can just act once per day, or we can allow updating. 
+      // If we don't throw, we need to adjust points. Let's keep it throwing to avoid complexity, 
+      // as they have a 'delete' button for logs if we add it, or they can just log it once.
+      throw new Error('Item already logged for this date.');
+    }
 
     const userRef = doc(db, 'users', userId);
     const userSnap = await transaction.get(userRef);
@@ -141,26 +144,9 @@ export const logDailyTask = async (
     let newTotalPoints = (userData.totalPoints || 0) + pointsAwarded;
     if (newTotalPoints < 0) newTotalPoints = 0;
 
-    // Skip token consumption
-    let newSkipTokens = userData.skipTokens ?? 3;
-    if (status === 'skipped') {
-      if (newSkipTokens <= 0) throw new Error('No skip tokens left this week.');
-      newSkipTokens -= 1;
-    }
-
-    // Streak: only 'done' advances. Missing a REQUIRED task resets. Skip is neutral.
-    let newStreak = userData.streakCount || 0;
-    if (status === 'done') {
-      newStreak += 1;
-    } else if (status === 'missed' && task.required) {
-      newStreak = 0;
-    }
-
     transaction.set(logRef, newLog);
     transaction.update(userRef, {
       totalPoints: newTotalPoints,
-      streakCount: newStreak,
-      skipTokens: newSkipTokens,
     });
   });
 
@@ -197,17 +183,22 @@ export const autoMissPendingTasks = async (
 
   let totalPenalty = 0;
   const batch = writeBatch(db);
-  let hadRequiredMiss = false;
 
   for (const task of pending) {
     const logId = `${userId}_${task.id}_${date}`;
     const penalty = -calcPenalty(task);
     totalPenalty += penalty;
-    if (task.required) hadRequiredMiss = true;
 
     const newLog: DailyLog = {
-      id: logId, userId, taskId: task.id, taskName: task.name,
-      date, status: 'missed', pointsAwarded: penalty,
+      id: logId, 
+      userId, 
+      taskId: task.id, 
+      taskName: task.name,
+      itemType: task.itemType,
+      date, 
+      status: 'missed', 
+      pointsAwarded: penalty,
+      createdAt: Date.now()
     };
     batch.set(doc(db, 'logs', logId), newLog);
   }
@@ -221,8 +212,7 @@ export const autoMissPendingTasks = async (
     const userData = userSnap.data() as UserData;
     let newPoints = (userData.totalPoints || 0) + totalPenalty;
     if (newPoints < 0) newPoints = 0;
-    const newStreak = hadRequiredMiss ? 0 : (userData.streakCount || 0);
-    tx.update(userRef, { totalPoints: newPoints, streakCount: newStreak });
+    tx.update(userRef, { totalPoints: newPoints });
   });
 
   return pending.length;
@@ -234,6 +224,11 @@ export const createReward = async (reward: Omit<Reward, 'id'>) => {
   const newReward = { ...reward, id: rewardRef.id };
   await setDoc(rewardRef, newReward);
   return newReward;
+};
+
+export const deleteReward = async (rewardId: string) => {
+  const { deleteDoc } = await import('firebase/firestore');
+  await deleteDoc(doc(db, 'rewards', rewardId));
 };
 
 export const redeemReward = async (userId: string, reward: Reward) => {

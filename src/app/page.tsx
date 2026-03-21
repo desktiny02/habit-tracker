@@ -3,26 +3,16 @@
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, checkAndResetSkipTokens } from '@/lib/firebase/firestore';
-import { Task, LogStatus, DailyLog, PRIORITY_CONFIG } from '@/types';
+import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks } from '@/lib/firebase/firestore';
+import { Task, LogStatus, DailyLog } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { Button } from '@/components/ui/button';
-import { Plus, SkipForward } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { doc, onSnapshot, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-
-// Sort: required first, then by priority (high > medium > low)
-const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-const sortTasks = (a: Task, b: Task): number => {
-  // Required first
-  if (a.required && !b.required) return -1;
-  if (!a.required && b.required) return 1;
-  // Then by priority
-  return (PRIORITY_ORDER[a.priority || 'medium'] ?? 1) - (PRIORITY_ORDER[b.priority || 'medium'] ?? 1);
-};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -32,8 +22,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [skipTokens, setSkipTokens] = useState(3);
 
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const yesterdayStr = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
@@ -41,11 +29,7 @@ export default function DashboardPage() {
 
   const loadData = useCallback(async (uid: string) => {
     try {
-      // Reset skip tokens if new week
-      checkAndResetSkipTokens(uid).catch(() => {});
-
       const userTasks = await getUserTasks(uid);
-
       // Auto-miss yesterday silently
       autoMissPendingTasks(uid, userTasks, yesterdayStr).catch(() => {});
 
@@ -73,13 +57,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-
     const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setTotalPoints(data.totalPoints || 0);
-        setStreak(data.streakCount || 0);
-        setSkipTokens(data.skipTokens ?? 3);
       }
     });
 
@@ -94,14 +75,15 @@ export default function DashboardPage() {
       const newLog = await logDailyTask(user.uid, taskId, taskName, status, task, todayStr);
       setTodayLogs((prev) => new Map(prev).set(taskId, newLog));
 
-      if (status === 'done') toast.success(`+${task.points} pts — nice work!`);
-      else if (status === 'missed') {
-        const pri = PRIORITY_CONFIG[task.priority || 'medium'];
-        const base = Math.floor(task.points * pri.missMultiplier);
-        const penalty = task.required ? Math.floor(base * 1.5) : base;
-        toast.error(`-${penalty} pts`);
+      if (task.itemType !== 'event') {
+        if (status === 'done') toast.success(`+${task.points} pts — nice work!`);
+        else if (status === 'missed') {
+          // just error notification
+          toast.error(`Task marked as missed.`);
+        }
+      } else {
+        toast.success(`Event logged.`);
       }
-      else toast(`Task skipped. (${skipTokens - 1} tokens left)`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Action failed');
     } finally {
@@ -113,9 +95,9 @@ export default function DashboardPage() {
     try {
       await deleteTask(taskId);
       setTasks(prev => prev.filter(t => t.id !== taskId));
-      toast.success('Task deleted');
+      toast.success('Removed successfully');
     } catch {
-      toast.error('Failed to delete task');
+      toast.error('Failed to remove');
     }
   };
 
@@ -125,15 +107,28 @@ export default function DashboardPage() {
       t.repeatType === 'daily' ||
       (t.repeatType === 'weekly' && t.repeatDays?.includes(currentDay)) ||
       (t.repeatType === 'once' && t.targetDate === todayStr)
-    )
-    .sort(sortTasks);
+    );
 
-  const pendingTasks = tasksForToday.filter((t) => !todayLogs.has(t.id));
-  const actedTasks = tasksForToday.filter((t) => todayLogs.has(t.id));
+  // Sorting newest first for pending tasks
+  const pendingTasks = tasksForToday
+    .filter((t) => !todayLogs.has(t.id))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  
+  // Sorting Logs newest first by the log creation time
+  // But actedTasks are tasks... let's combine and sort by log createdAt
+  const actedTasksWithLogs = tasksForToday
+    .filter(t => todayLogs.has(t.id))
+    .map(t => ({ task: t, log: todayLogs.get(t.id)! }))
+    .sort((a, b) => (b.log.createdAt || 0) - (a.log.createdAt || 0));
 
   const statusMeta = (log: DailyLog) => {
-    if (log.status === 'done') return { icon: '✓', color: 'var(--success)', sign: `+${log.pointsAwarded}` };
-    if (log.status === 'missed') return { icon: '✗', color: 'var(--danger)', sign: `${log.pointsAwarded}` };
+    if (log.itemType === 'event') {
+      if (log.status === 'done') return { icon: '✓', color: 'var(--success)' };
+      if (log.status === 'missed') return { icon: '✗', color: 'var(--danger)' };
+    } else {
+      if (log.status === 'done') return { icon: '✓', color: 'var(--success)', sign: `+${log.pointsAwarded}` };
+      if (log.status === 'missed') return { icon: '✗', color: 'var(--danger)', sign: `${log.pointsAwarded}` };
+    }
     return { icon: '→', color: 'var(--text-muted)', sign: '0' };
   };
 
@@ -141,51 +136,33 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="space-y-8">
         {/* ── Stats ────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="w-full">
           {/* Points */}
           <div
-            className="rounded-2xl p-4"
+            className="rounded-2xl p-6"
             style={{ background: 'linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)' }}
           >
-            <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Points</p>
-            <p className="text-3xl font-bold mt-1 text-white tracking-tight">{totalPoints}</p>
-          </div>
-
-          {/* Streak */}
-          <div
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Streak</p>
-            <p className="text-3xl font-bold mt-1 tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              {streak} <span className="text-xl">🔥</span>
-            </p>
-          </div>
-
-          {/* Skip Tokens */}
-          <div
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-              <SkipForward style={{ width: 12, height: 12 }} /> Skips
-            </p>
-            <p className="text-3xl font-bold mt-1 tracking-tight" style={{ color: skipTokens > 0 ? 'var(--text-primary)' : 'var(--danger)' }}>
-              {skipTokens}<span className="text-lg font-normal" style={{ color: 'var(--text-muted)' }}>/3</span>
-            </p>
+            <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Total Points</p>
+            <p className="text-4xl font-bold mt-1 text-white tracking-tight">{totalPoints}</p>
           </div>
         </div>
 
         {/* ── Pending Tasks ────────────────────────────── */}
         <div>
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              Today&apos;s Tasks
+              Today&apos;s Items
             </h2>
-            <Button onClick={() => router.push('/tasks/new')} size="sm" variant="outline" className="gap-1">
-              <Plus style={{ width: 15, height: 15 }} />
-              New Task
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => router.push('/tasks/new')} size="sm" variant="outline" className="gap-1">
+                <Plus style={{ width: 14, height: 14 }} />
+                Task
+              </Button>
+              <Button onClick={() => router.push('/events/new')} size="sm" variant="outline" className="gap-1 shadow-sm">
+                <Plus style={{ width: 14, height: 14 }} />
+                Event
+              </Button>
+            </div>
           </div>
 
           {loading ? (
@@ -204,7 +181,6 @@ export default function DashboardPage() {
                   onAction={handleAction}
                   onDelete={handleDeleteTask}
                   isLoading={actionLoading === task.id}
-                  skipTokens={skipTokens}
                 />
               ))}
             </div>
@@ -220,28 +196,22 @@ export default function DashboardPage() {
                 {tasksForToday.length === 0 && tasks.length > 0 ? 'Rest day!' : 'All done for today!'}
               </h3>
               <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                {tasksForToday.length === 0 && tasks.length > 0 ? 'No tasks scheduled.' : 'No more pending tasks.'}
+                {tasksForToday.length === 0 && tasks.length > 0 ? 'No items scheduled.' : 'No more pending items.'}
               </p>
-              {tasks.length === 0 && (
-                <Button onClick={() => router.push('/tasks/new')} className="mt-6">
-                  Create Your First Task
-                </Button>
-              )}
             </div>
           )}
         </div>
 
         {/* ── Logged Today ────────────────────────────── */}
-        {!loading && actedTasks.length > 0 && (
+        {!loading && actedTasksWithLogs.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
-              Logged Today ({actedTasks.length})
+              Logged Today ({actedTasksWithLogs.length})
             </h3>
             <div className="space-y-2">
-              {actedTasks.map((task) => {
-                const log = todayLogs.get(task.id)!;
+              {actedTasksWithLogs.map(({ task, log }) => {
                 const meta = statusMeta(log);
-                const pri = PRIORITY_CONFIG[task.priority || 'medium'];
+                const isEvent = task.itemType === 'event';
                 return (
                   <div
                     key={task.id}
@@ -263,15 +233,22 @@ export default function DashboardPage() {
                         <span className="text-sm font-medium truncate block" style={{ color: 'var(--text-primary)' }}>
                           {task.name}
                         </span>
-                        <span className="text-[10px] font-bold uppercase" style={{ color: pri.color }}>
-                          {pri.label}
-                          {task.required && ' · Required'}
-                        </span>
+                        {!isEvent ? (
+                          <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
+                            Task
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
+                            Event
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: meta.color }}>
-                      {meta.sign} pts
-                    </span>
+                    {!isEvent && meta.sign && (
+                       <span className="text-xs font-bold whitespace-nowrap" style={{ color: meta.color }}>
+                         {meta.sign} pts
+                       </span>
+                    )}
                   </div>
                 );
               })}

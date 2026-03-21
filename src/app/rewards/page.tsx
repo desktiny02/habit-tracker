@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase/config';
 import { doc, onSnapshot, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
-import { redeemReward, useCoupon } from '@/lib/firebase/firestore';
+import { redeemReward, useCoupon, deleteReward } from '@/lib/firebase/firestore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -123,6 +123,16 @@ export default function RewardsPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create reward';
       toast.error(msg);
+    }
+  };
+
+  const handleDeleteReward = async (reward: Reward) => {
+    try {
+      await deleteReward(reward.id);
+      setRewards((prev) => prev.filter((r) => r.id !== reward.id));
+      toast.success('Reward deleted');
+    } catch {
+      toast.error('Failed to delete reward');
     }
   };
 
@@ -276,6 +286,7 @@ export default function RewardsPage() {
               reward={reward}
               userPoints={totalPoints}
               onRedeem={handleRedeem}
+              onDelete={handleDeleteReward}
               isLoading={redeemingId === reward.id}
             />
           ))}

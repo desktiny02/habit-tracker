@@ -4,24 +4,23 @@ export interface UserData {
   email: string;
   username: string;
   totalPoints: number;
-  streakCount: number;
-  skipTokens: number;       // 3 per week, resets Monday 00:00
-  skipTokensResetAt: string; // ISO Monday date for next reset
   createdAt: number;
 }
 
 // Task Types
+export type ItemType = 'task' | 'event';
 export type RepeatType = 'daily' | 'weekly' | 'once';
 export type Priority = 'high' | 'medium' | 'low';
 
 export interface Task {
   id: string;
   userId: string;
+  itemType: ItemType;
   name: string;
   description?: string;
-  points: number;
+  points: number; // For events, this can be 0.
   priority: Priority;
-  required: boolean;    // Required tasks affect streak
+  required: boolean;
   repeatType: RepeatType;
   repeatDays?: number[];
   targetDate?: string;
@@ -36,9 +35,11 @@ export interface DailyLog {
   userId: string;
   taskId: string;
   taskName?: string;
-  date: string;
+  itemType?: ItemType;
+  date: string; // YYYY-MM-DD
   status: LogStatus;
   pointsAwarded: number;
+  createdAt?: number; // adding timestamp to properly sort
 }
 
 // Reward Types
@@ -54,7 +55,7 @@ export interface Redemption {
   userId: string;
   rewardId: string;
   rewardName?: string;
-  date: string;
+  date: string; // ISO string
   status?: 'unused' | 'used';
   pointsSpent: number;
 }

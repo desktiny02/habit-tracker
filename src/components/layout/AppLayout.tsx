@@ -36,8 +36,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Upcoming',  href: '/upcoming', icon: CalendarIcon },
     { name: 'Rewards',   href: '/rewards',  icon: Gift },
-    { name: 'Calendar',  href: '/calendar', icon: CalendarIcon },
     { name: 'History',   href: '/history',  icon: HistoryIcon },
     { name: 'Summary',   href: '/summary',  icon: BarChart3 },
   ];
