@@ -73,6 +73,8 @@ export default function RegisterPage() {
     let credential;
     try {
       credential = await createUserWithEmailAndPassword(auth, email, password);
+      // Wait for Auth token propagation
+      await new Promise((resolve) => setTimeout(resolve, 800));
       try {
         await createUserProfile(credential.user.uid, email, username);
         toast.success('Account created! Welcome 🎉');
