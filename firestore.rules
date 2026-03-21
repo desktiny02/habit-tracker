@@ -46,6 +46,7 @@ service cloud.firestore {
     match /logs/{logId} {
       allow read: if resource == null || isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
     }
     
     // Rewards Collection

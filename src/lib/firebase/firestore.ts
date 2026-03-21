@@ -146,6 +146,31 @@ export const logDailyTask = async (
   return newLog;
 };
 
+export const deleteDailyLog = async (userId: string, logId: string) => {
+  const logRef = doc(db, 'logs', logId);
+  
+  await runTransaction(db, async (transaction) => {
+    const logSnap = await transaction.get(logRef);
+    if (!logSnap.exists()) throw new Error('Log not found.');
+
+    const logData = logSnap.data() as DailyLog;
+    const pointsAwarded = logData.pointsAwarded || 0;
+
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await transaction.get(userRef);
+    if (!userSnap.exists()) throw new Error('User not found.');
+
+    const userData = userSnap.data() as UserData;
+    let newTotalPoints = (userData.totalPoints || 0) - pointsAwarded;
+    if (newTotalPoints < 0) newTotalPoints = 0;
+
+    transaction.delete(logRef);
+    transaction.update(userRef, {
+      totalPoints: newTotalPoints,
+    });
+  });
+};
+
 // ── Auto-miss pending tasks ─────────────────────────────────────
 export const autoMissPendingTasks = async (
   userId: string,

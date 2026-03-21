@@ -3,11 +3,11 @@
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks } from '@/lib/firebase/firestore';
+import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, deleteDailyLog } from '@/lib/firebase/firestore';
 import { Task, LogStatus, DailyLog } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, RotateCcw } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { doc, onSnapshot, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -98,6 +98,26 @@ export default function DashboardPage() {
       toast.success('Removed successfully');
     } catch {
       toast.error('Failed to remove');
+    }
+  };
+
+  const [undoLoading, setUndoLoading] = useState<string | null>(null);
+
+  const handleUndoLog = async (taskId: string, logId: string) => {
+    if (!user) return;
+    setUndoLoading(taskId);
+    try {
+      await deleteDailyLog(user.uid, logId);
+      setTodayLogs((prev) => {
+        const next = new Map(prev);
+        next.delete(taskId);
+        return next;
+      });
+      toast.success('Log reversed successfully');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Undo failed');
+    } finally {
+      setUndoLoading(null);
     }
   };
 
@@ -276,11 +296,24 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
-                    {!isEvent && meta.sign && (
-                       <span className="text-xs font-bold whitespace-nowrap" style={{ color: meta.color }}>
-                         {meta.sign} pts
-                       </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {!isEvent && meta.sign && (
+                         <span className="text-xs font-bold whitespace-nowrap" style={{ color: meta.color }}>
+                           {meta.sign} pts
+                         </span>
+                      )}
+                      <button
+                        onClick={() => handleUndoLog(task.id, log.id)}
+                        disabled={undoLoading === task.id}
+                        className="p-1.5 rounded-full hover:bg-[var(--bg-raised)] transition-colors cursor-pointer group disabled:opacity-50"
+                        title="Undo log"
+                      >
+                        <RotateCcw 
+                          style={{ width: 14, height: 14, color: 'var(--text-muted)' }} 
+                          className={`group-hover:text-[var(--text-primary)] transition-colors ${undoLoading === task.id ? 'animate-spin' : ''}`} 
+                        />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
