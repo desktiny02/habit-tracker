@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon } from 'lucide-react';
 import { auth } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
 
@@ -38,6 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Rewards',   href: '/rewards',  icon: Gift },
     { name: 'Calendar',  href: '/calendar', icon: CalendarIcon },
+    { name: 'History',   href: '/history',  icon: HistoryIcon },
   ];
 
   return (

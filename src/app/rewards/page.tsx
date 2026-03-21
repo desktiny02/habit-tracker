@@ -3,21 +3,24 @@
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState } from 'react';
-import { Reward } from '@/types';
+import { Reward, Redemption } from '@/types';
 import { RewardCard } from '@/components/rewards/RewardCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase/config';
 import { doc, onSnapshot, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
-import { redeemReward } from '@/lib/firebase/firestore';
+import { redeemReward, useCoupon } from '@/lib/firebase/firestore';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 export default function RewardsPage() {
   const { user } = useAuth();
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [usingId, setUsingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardCost, setNewRewardCost] = useState('');
@@ -31,10 +34,15 @@ export default function RewardsPage() {
 
     const loadRewards = async () => {
       try {
-        const q = query(collection(db, 'rewards'), where('userId', '==', user.uid));
-        const snaps = await getDocs(q);
-        setRewards(snaps.docs.map((d) => ({ ...d.data(), id: d.id } as Reward)));
-      } catch {
+        const qRewards = query(collection(db, 'rewards'), where('userId', '==', user.uid));
+        const qRedemptions = query(collection(db, 'redemptions'), where('userId', '==', user.uid));
+        const [rewSnaps, redSnaps] = await Promise.all([getDocs(qRewards), getDocs(qRedemptions)]);
+        
+        setRewards(rewSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Reward)));
+        const loadedRedemptions = redSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Redemption));
+        setRedemptions(loadedRedemptions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      } catch (err: any) {
+        console.error(err);
         toast.error('Failed to load rewards');
       } finally {
         setLoading(false);
@@ -51,10 +59,30 @@ export default function RewardsPage() {
     try {
       await redeemReward(user.uid, reward);
       toast.success(`Redeemed "${reward.name}"!`);
+      // Reload redemptions purely to get the new local ID quickly, or manually push. Manually push is faster.
+      const qRedemptions = query(collection(db, 'redemptions'), where('userId', '==', user.uid));
+      const redSnaps = await getDocs(qRedemptions);
+      const loadedRedemptions = redSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Redemption));
+      setRedemptions(loadedRedemptions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch (err: any) {
       toast.error(err.message || 'Failed to redeem');
     } finally {
       setRedeemingId(null);
+    }
+  };
+
+  const handleUseCoupon = async (redemptionId: string) => {
+    if (confirm('Are you sure you want to use this coupon now?')) {
+      setUsingId(redemptionId);
+      try {
+        await useCoupon(redemptionId);
+        setRedemptions(prev => prev.map(r => r.id === redemptionId ? { ...r, status: 'used' } : r));
+        toast.success('Coupon used successfully!');
+      } catch (err: any) {
+        toast.error('Failed to use coupon');
+      } finally {
+        setUsingId(null);
+      }
     }
   };
 
@@ -189,6 +217,55 @@ export default function RewardsPage() {
               isLoading={redeemingId === reward.id}
             />
           ))}
+        </div>
+      )}
+
+      {/* Coupons List */}
+      {!loading && redemptions.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-xl font-bold mb-5" style={{ color: 'var(--text-primary)' }}>
+            My Coupons
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {redemptions.map((red) => (
+              <div
+                key={red.id}
+                className="rounded-2xl p-5 flex flex-col justify-between"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  opacity: red.status === 'used' ? 0.6 : 1,
+                  filter: red.status === 'used' ? 'grayscale(80%)' : 'none',
+                }}
+              >
+                <div>
+                  <h3 className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>
+                    {red.rewardName || 'Reward'}
+                  </h3>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Redeemed on {format(new Date(red.date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                  {red.status === 'used' ? (
+                    <div className="text-sm font-medium text-center py-2" style={{ color: 'var(--text-muted)' }}>
+                      Used
+                    </div>
+                  ) : (
+                    <Button 
+                      className="w-full" 
+                      onClick={() => handleUseCoupon(red.id)}
+                      disabled={usingId === red.id}
+                      variant="primary"
+                    >
+                      {usingId === red.id ? 'Using...' : 'Use Coupon'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </AppLayout>

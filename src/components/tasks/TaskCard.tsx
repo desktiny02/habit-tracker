@@ -5,7 +5,7 @@ import { Check, X, SkipForward } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
-  onAction: (taskId: string, status: LogStatus, points: number) => void;
+  onAction: (taskId: string, taskName: string, status: LogStatus, points: number) => void;
   isLoading: boolean;
 }
 
@@ -37,7 +37,7 @@ export function TaskCard({ task, onAction, isLoading }: TaskCardProps) {
       <div className="flex items-center gap-2 shrink-0">
         {/* Skip */}
         <button
-          onClick={() => onAction(task.id, 'skipped', task.points)}
+          onClick={() => onAction(task.id, task.name, 'skipped', task.points)}
           disabled={isLoading}
           title="Skip"
           className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
@@ -48,7 +48,7 @@ export function TaskCard({ task, onAction, isLoading }: TaskCardProps) {
 
         {/* Miss */}
         <button
-          onClick={() => onAction(task.id, 'missed', task.points)}
+          onClick={() => onAction(task.id, task.name, 'missed', task.points)}
           disabled={isLoading}
           title="Mark as missed"
           className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
@@ -59,7 +59,7 @@ export function TaskCard({ task, onAction, isLoading }: TaskCardProps) {
 
         {/* Done */}
         <button
-          onClick={() => onAction(task.id, 'done', task.points)}
+          onClick={() => onAction(task.id, task.name, 'done', task.points)}
           disabled={isLoading}
           title="Mark as done"
           className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 disabled:opacity-40 shadow-md"

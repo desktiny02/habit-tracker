@@ -29,6 +29,7 @@ export interface DailyLog {
   id: string;
   userId: string;
   taskId: string;
+  taskName?: string; // For history
   date: string; // YYYY-MM-DD
   status: LogStatus;
   pointsAwarded: number;
@@ -46,6 +47,8 @@ export interface Redemption {
   id: string;
   userId: string;
   rewardId: string;
+  rewardName?: string; // For history/coupons
   date: string;
+  status?: 'unused' | 'used';
   pointsSpent: number;
 }

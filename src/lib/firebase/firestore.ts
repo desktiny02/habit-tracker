@@ -80,7 +80,7 @@ export const getUserTasks = async (userId: string) => {
 };
 
 // Daily Logs & Points Logic
-export const logDailyTask = async (userId: string, taskId: string, status: LogStatus, taskPoints: number, date: string) => {
+export const logDailyTask = async (userId: string, taskId: string, taskName: string, status: LogStatus, taskPoints: number, date: string) => {
   const logId = `${userId}_${taskId}_${date}`;
   const logRef = doc(db, 'logs', logId);
   
@@ -92,6 +92,7 @@ export const logDailyTask = async (userId: string, taskId: string, status: LogSt
     id: logId,
     userId,
     taskId,
+    taskName,
     date,
     status,
     pointsAwarded
@@ -140,11 +141,18 @@ export const redeemReward = async (userId: string, reward: Reward) => {
       id: redemptionRef.id,
       userId,
       rewardId: reward.id,
+      rewardName: reward.name,
       date: new Date().toISOString(),
+      status: 'unused',
       pointsSpent: reward.cost
     };
 
     transaction.set(redemptionRef, redemption);
     transaction.update(userRef, { totalPoints: userData.totalPoints - reward.cost });
   });
+};
+
+export const useCoupon = async (redemptionId: string) => {
+  const ref = doc(db, 'redemptions', redemptionId);
+  await updateDoc(ref, { status: 'used' });
 };

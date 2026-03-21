@@ -60,12 +60,12 @@ export default function DashboardPage() {
     return () => unsubscribeUser();
   }, [user]);
 
-  const handleAction = async (taskId: string, status: LogStatus, points: number) => {
+  const handleAction = async (taskId: string, taskName: string, status: LogStatus, points: number) => {
     if (!user) return;
     setActionLoading(taskId);
     try {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
-      await logDailyTask(user.uid, taskId, status, points, todayStr);
+      await logDailyTask(user.uid, taskId, taskName, status, points, todayStr);
       setLogsToday((prev) => new Set(prev).add(taskId));
       if (status === 'done')    toast.success(`+${points} pts — nice work!`);
       else if (status === 'missed') toast.error(`-${Math.floor(points / 2)} pts`);
