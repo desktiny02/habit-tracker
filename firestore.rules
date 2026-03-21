@@ -40,7 +40,7 @@ service cloud.firestore {
     
     // Logs Collection
     match /logs/{logId} {
-      allow read: if isOwner(resource.data.userId);
+      allow read: if resource == null || isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
     }
     
