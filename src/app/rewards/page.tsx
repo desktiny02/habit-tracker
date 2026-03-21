@@ -53,19 +53,27 @@ export default function RewardsPage() {
     return () => unsubscribeUser();
   }, [user]);
 
+  const [confirmingRewardId, setConfirmingRewardId] = useState<string | null>(null);
+  const confirmingReward = rewards.find(r => r.id === confirmingRewardId);
+
   const handleRedeem = async (reward: Reward) => {
+    // First click shows confirmation; second click executes
+    if (confirmingRewardId !== reward.id) {
+      setConfirmingRewardId(reward.id);
+      return;
+    }
     if (!user) return;
     setRedeemingId(reward.id);
+    setConfirmingRewardId(null);
     try {
       await redeemReward(user.uid, reward);
       toast.success(`Redeemed "${reward.name}"!`);
-      // Reload redemptions purely to get the new local ID quickly, or manually push. Manually push is faster.
       const qRedemptions = query(collection(db, 'redemptions'), where('userId', '==', user.uid));
       const redSnaps = await getDocs(qRedemptions);
       const loadedRedemptions = redSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Redemption));
       setRedemptions(loadedRedemptions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to redeem');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to redeem');
     } finally {
       setRedeemingId(null);
     }
@@ -186,6 +194,51 @@ export default function RewardsPage() {
             Save
           </Button>
         </form>
+      )}
+
+      {/* Redemption Confirmation */}
+      {confirmingReward && (
+        <div
+          className="rounded-2xl p-5 mb-6"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            border: '2px solid var(--accent)',
+            boxShadow: '0 0 20px rgba(99,102,241,0.15)',
+          }}
+        >
+          <h3 className="font-bold text-base mb-3" style={{ color: 'var(--text-primary)' }}>
+            Redeem &quot;{confirmingReward.name}&quot;?
+          </h3>
+          <div className="flex justify-between text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+            <span>Current points</span>
+            <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{totalPoints}</span>
+          </div>
+          <div className="flex justify-between text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+            <span>Cost</span>
+            <span className="font-bold" style={{ color: 'var(--danger)' }}>−{confirmingReward.cost}</span>
+          </div>
+          <div
+            className="flex justify-between text-sm pt-2 mt-2 font-bold"
+            style={{ borderTop: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          >
+            <span>Remaining</span>
+            <span style={{ color: totalPoints - confirmingReward.cost >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              {totalPoints - confirmingReward.cost} pts
+            </span>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="secondary" className="flex-1" onClick={() => setConfirmingRewardId(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => handleRedeem(confirmingReward)}
+              disabled={redeemingId === confirmingReward.id || totalPoints < confirmingReward.cost}
+            >
+              {redeemingId === confirmingReward.id ? 'Redeeming…' : 'Confirm Redeem'}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* List */}

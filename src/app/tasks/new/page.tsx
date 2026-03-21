@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/firebase/auth';
 import { createTask } from '@/lib/firebase/firestore';
+import { Priority, PRIORITY_CONFIG } from '@/types';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -14,18 +15,21 @@ import Link from 'next/link';
 export default function NewTaskPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [name, setName]     = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [points, setPoints] = useState('');
+  const [priority, setPriority] = useState<Priority>('medium');
+  const [required, setRequired] = useState(true);
   const [loading, setLoading] = useState(false);
-  
+
   const [repeatType, setRepeatType] = useState<'daily' | 'weekly' | 'once'>('daily');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [targetDate, setTargetDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const toggleDay = (dayIndex: number) => {
-    setRepeatDays(prev => 
-      prev.includes(dayIndex) 
-        ? prev.filter(d => d !== dayIndex) 
+    setRepeatDays(prev =>
+      prev.includes(dayIndex)
+        ? prev.filter(d => d !== dayIndex)
         : [...prev, dayIndex].sort()
     );
   };
@@ -35,28 +39,31 @@ export default function NewTaskPage() {
     if (!user) return;
     const pts = parseInt(points, 10);
     if (isNaN(pts) || pts <= 0) return void toast.error('Points must be a positive number');
-    
+    if (pts > 1000) return void toast.error('Points cannot exceed 1000');
     if (repeatType === 'weekly' && repeatDays.length === 0) {
-      return void toast.error('Please select at least one day for the task');
+      return void toast.error('Select at least one day');
     }
     if (repeatType === 'once' && !targetDate) {
-      return void toast.error('Please select a date for the task');
+      return void toast.error('Select a date');
     }
 
     setLoading(true);
     try {
-      await createTask({ 
-        userId: user.uid, 
-        name, 
-        points: pts, 
+      await createTask({
+        userId: user.uid,
+        name,
+        description,
+        points: pts,
+        priority,
+        required,
         repeatType,
         ...(repeatType === 'weekly' ? { repeatDays } : {}),
-        ...(repeatType === 'once' ? { targetDate } : {})
+        ...(repeatType === 'once' ? { targetDate } : {}),
       });
       toast.success('Task created!');
       router.push('/');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create task');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create task');
     } finally {
       setLoading(false);
     }
@@ -83,16 +90,11 @@ export default function NewTaskPage() {
         <form
           onSubmit={handleSubmit}
           className="rounded-2xl p-6 space-y-5"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
-          }}
+          style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
         >
+          {/* Name */}
           <div>
-            <label
-              className="block text-sm font-medium mb-1.5"
-              style={{ color: 'var(--text-secondary)' }}
-            >
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               Task Name
             </label>
             <Input
@@ -104,41 +106,109 @@ export default function NewTaskPage() {
             />
           </div>
 
+          {/* Description */}
           <div>
-            <label
-              className="block text-sm font-medium mb-1.5"
-              style={{ color: 'var(--text-secondary)' }}
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Description <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+            </label>
+            <textarea
+              className="flex w-full rounded-xl px-3 py-2 text-sm transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 resize-none"
+              style={{
+                backgroundColor: 'var(--bg-raised)',
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border-strong)',
+                minHeight: 80,
+              }}
+              placeholder="Details about this task..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={300}
+            />
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Priority
+            </label>
+            <div className="flex gap-2">
+              {(['high', 'medium', 'low'] as Priority[]).map((p) => {
+                const cfg = PRIORITY_CONFIG[p];
+                const selected = priority === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    className="flex-1 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer"
+                    style={{
+                      backgroundColor: selected ? cfg.bg : 'var(--bg-raised)',
+                      color: selected ? cfg.color : 'var(--text-muted)',
+                      border: selected ? `1.5px solid ${cfg.color}` : '1.5px solid transparent',
+                    }}
+                  >
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Higher priority → bigger penalty if missed.
+            </p>
+          </div>
+
+          {/* Required toggle */}
+          <div
+            className="flex items-center justify-between rounded-xl p-3"
+            style={{ backgroundColor: 'var(--bg-raised)' }}
+          >
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Required task</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Missing breaks your streak + 50% extra penalty
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRequired(!required)}
+              className="w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0"
+              style={{
+                backgroundColor: required ? 'var(--accent)' : 'var(--bg-surface)',
+                border: required ? 'none' : '1px solid var(--border-strong)',
+                position: 'relative',
+              }}
             >
+              <span
+                className="block w-5 h-5 rounded-full bg-white shadow-sm transition-transform"
+                style={{
+                  transform: required ? 'translateX(22px)' : 'translateX(2px)',
+                  marginTop: 2,
+                }}
+              />
+            </button>
+          </div>
+
+          {/* Frequency */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               Frequency
             </label>
             <div className="flex gap-4 mb-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={repeatType === 'daily'}
-                  onChange={() => setRepeatType('daily')}
-                  className="accent-[var(--accent)]"
-                />
-                <span className="text-sm">Everyday</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={repeatType === 'weekly'}
-                  onChange={() => setRepeatType('weekly')}
-                  className="accent-[var(--accent)]"
-                />
-                <span className="text-sm">Specific Days</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={repeatType === 'once'}
-                  onChange={() => setRepeatType('once')}
-                  className="accent-[var(--accent)]"
-                />
-                <span className="text-sm">Once</span>
-              </label>
+              {[
+                { value: 'daily' as const, label: 'Everyday' },
+                { value: 'weekly' as const, label: 'Specific Days' },
+                { value: 'once' as const, label: 'Once' },
+              ].map((opt) => (
+                <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={repeatType === opt.value}
+                    onChange={() => setRepeatType(opt.value)}
+                    className="accent-[var(--accent)]"
+                  />
+                  <span className="text-sm">{opt.label}</span>
+                </label>
+              ))}
             </div>
 
             {repeatType === 'weekly' && (
@@ -162,7 +232,7 @@ export default function NewTaskPage() {
                 })}
               </div>
             )}
-            
+
             {repeatType === 'once' && (
               <div className="mt-3">
                 <Input
@@ -170,17 +240,15 @@ export default function NewTaskPage() {
                   required
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]} // prevent past dates if desired
+                  min={new Date().toISOString().split('T')[0]}
                 />
               </div>
             )}
           </div>
 
+          {/* Points */}
           <div>
-            <label
-              className="block text-sm font-medium mb-1.5"
-              style={{ color: 'var(--text-secondary)' }}
-            >
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               Completion Points
             </label>
             <Input
@@ -193,7 +261,7 @@ export default function NewTaskPage() {
               onChange={(e) => setPoints(e.target.value)}
             />
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              1–1000 pts per completion. Miss and lose half.
+              1–1000 pts per completion.
             </p>
           </div>
 

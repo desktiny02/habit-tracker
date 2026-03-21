@@ -16,9 +16,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
-      // Only allow updating totalPoints and streakCount (not email, username, etc.)
       allow update: if isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'streakCount']);      
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['totalPoints', 'streakCount', 'skipTokens', 'skipTokensResetAt']);      
     }
 
     // Usernames lookup Collection
