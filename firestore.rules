@@ -17,8 +17,9 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['totalPoints']);      
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
+        && request.resource.data.totalPoints >= 0
+        && (request.resource.data.totalPoints - resource.data.totalPoints <= 1000);      
     }
 
     // Usernames lookup Collection
@@ -45,7 +46,9 @@ service cloud.firestore {
     // Logs Collection
     match /logs/{logId} {
       allow read: if resource == null || isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId)
+         && request.resource.data.pointsAwarded >= -1000 
+         && request.resource.data.pointsAwarded <= 1000;
       allow delete: if isOwner(resource.data.userId);
     }
     
