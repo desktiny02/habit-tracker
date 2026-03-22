@@ -6,88 +6,67 @@ import { CheckCircle, Calendar, Gift, Clock, History, BarChart3, Zap, AlertTrian
 const sections = [
   {
     icon: CheckCircle,
-    title: 'Tasks',
+    title: 'What is a Task?',
     color: 'var(--success)',
     items: [
-      'Tasks are daily habits you want to build or track.',
-      'Each task awards points when completed.',
-      'You can set priority (High / Medium / Low) — higher priority means a bigger penalty if you miss it.',
-      'Required tasks carry an extra 50% penalty when missed.',
-      'Tasks can repeat daily, on specific weekdays, or be one-time.',
+      'A habit or chore you track daily, weekly, or on a specific date.',
+      'Earn points every time you complete them.',
+      'Priorities (High/Medium/Low) determine the penalty size if missed.',
+      'Required tasks have an extra penalty if you miss them.',
     ],
   },
   {
     icon: Calendar,
-    title: 'Events',
+    title: 'What is an Event?',
     color: 'var(--accent)',
     items: [
-      'Events are calendar-style notes for a specific date.',
-      'They do NOT give or deduct points.',
-      'Mark them done ✓ or not done ✗ for your own tracking.',
-      'Events appear only on their scheduled date.',
+      'A calendar note or appointment for a specific day.',
+      'Events do NOT give or deduct any points.',
+      'They appear on your Dashboard only on their scheduled date.',
+      'No penalties. Mark them done or leave them as reminders.',
     ],
   },
   {
     icon: Zap,
-    title: 'Points',
+    title: 'How Points Work',
     color: '#f59e0b',
     items: [
-      'Completing a task earns you its point value.',
-      'Missing a task deducts points based on priority.',
-      'Events never affect your point balance.',
-      'Your total points are shown on the Dashboard.',
+      'Complete Task = Earn its full point value.',
+      'Missed Task = Lose a portion of points (High priority loses more).',
+      'Required Missed = Extra 50% penalty on top.',
+      'Undo = You can undo a completed task on the same day to revert points.',
     ],
   },
   {
     icon: Gift,
-    title: 'Rewards',
+    title: 'How Rewards Work',
     color: '#ec4899',
     items: [
       'Create custom rewards with a point cost.',
-      'Redeem rewards when you have enough points.',
-      'Redeemed rewards become coupons you can use later.',
-      'Each coupon can be used once — confirm before using.',
+      'Spend your points to redeem these rewards.',
+      'Redeemed rewards turn into usable Coupons.',
+      'Use the coupon whenever you actually claim the reward.',
     ],
   },
   {
     icon: Clock,
-    title: 'Upcoming',
+    title: 'What is Upcoming Page',
     color: 'var(--accent)',
     items: [
-      'Shows all your future tasks, events, and recurring items.',
-      'Delete items here to remove them from all views.',
-      'Deleting a recurring task stops it from appearing.',
+      'See all your future tasks, events, and recurring items in one place.',
+      'Items are grouped neatly by schedule (Daily, Weekly, Specific Dates).',
+      'Need to cancel a habit? Delete it here to stop it from appearing.',
     ],
   },
   {
     icon: History,
-    title: 'History',
+    title: 'How History Works',
     color: 'var(--text-secondary)',
     items: [
-      'Shows your 15 most recent activities.',
-      'Includes task completions, missed tasks, and reward redemptions.',
-      'Click "Load More" to see older activity.',
-    ],
-  },
-  {
-    icon: BarChart3,
-    title: 'Weekly Summary',
-    color: 'var(--success)',
-    items: [
-      'Shows your completion rate for the current week.',
-      'Tracks points earned vs points lost.',
-      'Helps you see how consistent you are.',
-    ],
-  },
-  {
-    icon: AlertTriangle,
-    title: 'Missed Tasks',
-    color: 'var(--danger)',
-    items: [
-      'If you don\'t complete a task by end of day, it auto-marks as missed.',
-      'Penalty depends on priority: High = 100%, Medium = 50%, Low = 30% of the task\'s points.',
-      'Required tasks get an additional 50% penalty on top.',
-      'Events are never auto-missed.',
+      'A timeline of your past actions (Logs and Redemptions).',
+      'Grouped clearly by date, starting with the most recent.',
+      'Items inside each day are sorted by Priority automatically.',
+      'Scroll down and click "Load More" to see older activities.',
     ],
   },
 ];
@@ -95,38 +74,39 @@ const sections = [
 export default function GuidePage() {
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-          How It Works
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-3xl font-extrabold tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>
+          Guide & Documentation
         </h1>
-        <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
-          Everything you need to know about using Habit Tracker.
+        <p className="text-sm font-medium mb-10" style={{ color: 'var(--text-muted)' }}>
+          Quick, simple answers on how to get the most out of your tracker.
         </p>
 
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {sections.map((section) => (
             <div
               key={section.title}
-              className="rounded-2xl p-5"
+              className="rounded-3xl p-6 transition-transform hover:-translate-y-1"
               style={{
                 backgroundColor: 'var(--bg-surface)',
                 border: '1px solid var(--border)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
               }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                   style={{ backgroundColor: `${section.color}18` }}
                 >
-                  <section.icon style={{ width: 18, height: 18, color: section.color }} />
+                  <section.icon style={{ width: 20, height: 20, color: section.color }} />
                 </div>
-                <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                <h2 className="text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                   {section.title}
                 </h2>
               </div>
-              <ul className="space-y-2.5 pl-1">
+              <ul className="space-y-3 pl-1">
                 {section.items.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  <li key={idx} className="flex items-start gap-3 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     <span
                       className="inline-block w-1.5 h-1.5 rounded-full shrink-0 mt-[7px]"
                       style={{ backgroundColor: section.color }}

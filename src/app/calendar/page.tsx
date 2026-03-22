@@ -155,23 +155,11 @@ export default function CalendarPage() {
                       {format(day, 'd')}
                     </span>
                     <div className="flex flex-wrap gap-0.5 justify-center mt-auto mb-1 px-1">
-                      {dayLogs.map((log) => {
-                        const color =
-                          log.status === 'done'   ? 'var(--success)' :
-                          log.status === 'missed' ? 'var(--danger)'  :
-                          'var(--text-muted)';
-                        return (
-                          <span
-                            key={log.id}
-                            style={{
-                              display: 'inline-block',
-                              width: 6, height: 6,
-                              borderRadius: '99px',
-                              backgroundColor: color,
-                            }}
-                          />
-                        );
-                      })}
+                      {dayLogs.length > 0 && (
+                        <span className="text-[9px] font-semibold tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                          {dayLogs.length} {dayLogs.length === 1 ? 'item' : 'items'}
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -226,19 +214,6 @@ export default function CalendarPage() {
               </div>
             )}
 
-            {/* Legend */}
-            <div className="mt-6 flex items-center justify-center gap-6 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              {[
-                { label: 'Done',    color: 'var(--success)' },
-                { label: 'Missed',  color: 'var(--danger)'  },
-                { label: 'Skipped', color: 'var(--text-muted)' },
-              ].map(({ label, color }) => (
-                <div key={label} className="flex items-center gap-1.5">
-                  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '99px', backgroundColor: color }} />
-                  {label}
-                </div>
-              ))}
-            </div>
           </>
         )}
       </div>

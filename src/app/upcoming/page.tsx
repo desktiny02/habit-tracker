@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Trash2, X, Calendar, Repeat, CalendarClock } from 'lucide-react';
+import { sortTasksWithinDate } from '@/lib/sorting';
 
 export default function UpcomingPage() {
   const { user } = useAuth();
@@ -114,106 +115,144 @@ export default function UpcomingPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {items.map(item => {
-              const isEvent = item.itemType === 'event';
-              const pri = isEvent ? null : PRIORITY_CONFIG[item.priority || 'medium'];
-              const Icon = ScheduleIcon(item);
-              const isConfirming = confirmDeleteId === item.id;
+          <div className="space-y-8">
+            {(()=>{
+              const grouped = items.reduce((acc, item) => {
+                let g = 'Once';
+                if (item.repeatType === 'daily') g = 'Daily';
+                else if (item.repeatType === 'weekly') g = 'Weekly';
+                else if (item.targetDate) g = item.targetDate; // yyyy-MM-dd
+                if (!acc[g]) acc[g] = [];
+                acc[g].push(item);
+                return acc;
+              }, {} as Record<string, Task[]>);
+      
+              const groupKeys = Object.keys(grouped).sort((a, b) => {
+                if (a === 'Daily') return -1;
+                if (b === 'Daily') return 1;
+                if (a === 'Weekly') return -1;
+                if (b === 'Weekly') return 1;
+                if (a === 'Once') return 1;
+                if (b === 'Once') return -1;
+                return a.localeCompare(b);
+              });
 
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-2xl p-4 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-surface)',
-                    border: isEvent
-                      ? '1px solid var(--border)'
-                      : item.required
-                      ? `1.5px solid ${pri?.color}40`
-                      : '1px solid var(--border)',
-                    opacity: deletingId === item.id ? 0.5 : 1,
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    {/* Left info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {isEvent ? (
-                          <span
-                            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-secondary)' }}
-                          >
-                            <Calendar style={{ width: 10, height: 10 }} /> Event
-                          </span>
-                        ) : (
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: pri?.bg, color: pri?.color }}
-                          >
-                            {pri?.label}
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="font-semibold text-base leading-snug mt-1" style={{ color: 'var(--text-primary)' }}>
-                        {item.name}
-                      </h3>
-
-                      <div className="flex items-center gap-1.5 mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        <Icon style={{ width: 12, height: 12 }} />
-                        {scheduleLabel(item)}
-                        {!isEvent && (
-                          <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>
-                            · {item.points} pts
-                          </span>
-                        )}
-                      </div>
-
-                      {item.description && (
-                        <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Right actions */}
-                    <div className="flex items-center gap-2 shrink-0 pt-1">
-                      {isConfirming ? (
-                        <>
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
-                            style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-muted)' }}
-                            title="Cancel"
-                          >
-                            <X style={{ width: 16, height: 16 }} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            disabled={deletingId === item.id}
-                            className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 shadow-md disabled:opacity-40"
-                            style={{ backgroundColor: '#ef4444', color: '#fff' }}
-                            title="Confirm delete"
-                          >
-                            <Trash2 style={{ width: 16, height: 16 }} />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteId(item.id)}
-                          disabled={deletingId === item.id}
-                          title="Delete item"
-                          className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
-                          style={{ color: 'var(--text-muted)' }}
+              return groupKeys.map(k => {
+                grouped[k].sort(sortTasksWithinDate);
+                const title = k === 'Daily' ? 'Daily Habits' 
+                            : k === 'Weekly' ? 'Weekly Habits' 
+                            : k === 'Once' ? 'One-time Items'
+                            : format(new Date(k + 'T12:00:00'), 'EEEE, MMM d, yyyy');
+                return (
+                  <div key={k} className="space-y-3">
+                    <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+                      {title}
+                    </h2>
+                    {grouped[k].map(item => {
+                      const isEvent = item.itemType === 'event';
+                      const pri = isEvent ? null : PRIORITY_CONFIG[item.priority || 'medium'];
+                      const Icon = ScheduleIcon(item);
+                      const isConfirming = confirmDeleteId === item.id;
+        
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-2xl p-4 transition-all"
+                          style={{
+                            backgroundColor: 'var(--bg-surface)',
+                            border: isEvent
+                              ? '1px solid var(--border)'
+                              : item.required
+                              ? `1.5px solid ${pri?.color}40`
+                              : '1px solid var(--border)',
+                            opacity: deletingId === item.id ? 0.5 : 1,
+                          }}
                         >
-                          <Trash2 style={{ width: 14, height: 14 }} />
-                        </button>
-                      )}
-                    </div>
+                          <div className="flex items-start justify-between gap-3">
+                            {/* Left info */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                {isEvent ? (
+                                  <span
+                                    className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                    style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-secondary)' }}
+                                  >
+                                    <Calendar style={{ width: 10, height: 10 }} /> Event
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                    style={{ backgroundColor: pri?.bg, color: pri?.color }}
+                                  >
+                                    {pri?.label}
+                                  </span>
+                                )}
+                              </div>
+        
+                              <h3 className="font-semibold text-base leading-snug mt-1" style={{ color: 'var(--text-primary)' }}>
+                                {item.name}
+                              </h3>
+        
+                              <div className="flex items-center gap-1.5 mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                                <Icon style={{ width: 12, height: 12 }} />
+                                {scheduleLabel(item)}
+                                {!isEvent && (
+                                  <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>
+                                    · {item.points} pts
+                                  </span>
+                                )}
+                              </div>
+        
+                              {item.description && (
+                                <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+        
+                            {/* Right actions */}
+                            <div className="flex items-center gap-2 shrink-0 pt-1">
+                              {isConfirming ? (
+                                <>
+                                  <button
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
+                                    style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-muted)' }}
+                                    title="Cancel"
+                                  >
+                                    <X style={{ width: 16, height: 16 }} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(item.id)}
+                                    disabled={deletingId === item.id}
+                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 shadow-md disabled:opacity-40"
+                                    style={{ backgroundColor: '#ef4444', color: '#fff' }}
+                                    title="Confirm delete"
+                                  >
+                                    <Trash2 style={{ width: 16, height: 16 }} />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmDeleteId(item.id)}
+                                  disabled={deletingId === item.id}
+                                  title="Delete item"
+                                  className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
+                                  style={{ color: 'var(--text-muted)' }}
+                                >
+                                  <Trash2 style={{ width: 14, height: 14 }} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
+          </div>
           </div>
         )}
       </div>

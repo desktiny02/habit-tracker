@@ -21,6 +21,7 @@ export default function RewardsPage() {
   const [loading, setLoading] = useState(true);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
   const [usingId, setUsingId] = useState<string | null>(null);
+  const [showUsedCoupons, setShowUsedCoupons] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardCost, setNewRewardCost] = useState('');
@@ -296,11 +297,22 @@ export default function RewardsPage() {
       {/* Coupons List */}
       {!loading && redemptions.length > 0 && (
         <div className="mt-12">
-          <h2 className="text-xl font-bold mb-5" style={{ color: 'var(--text-primary)' }}>
-            My Coupons
-          </h2>
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              My Coupons
+            </h2>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowUsedCoupons(!showUsedCoupons)}
+            >
+              {showUsedCoupons ? 'Hide Used Coupons' : 'Show Used Coupons'}
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {redemptions.map((red) => (
+            {redemptions
+              .filter(red => showUsedCoupons || red.status !== 'used')
+              .map((red) => (
               <div
                 key={red.id}
                 className="rounded-2xl p-5 flex flex-col justify-between"

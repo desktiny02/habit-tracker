@@ -154,7 +154,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Mobile bottom nav ─────────────────────────────────── */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 flex justify-around px-2 py-2 z-50"
+        className="md:hidden fixed bottom-0 inset-x-0 flex justify-between px-1 py-1.5 z-50"
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderTop: '1px solid var(--border)',
@@ -167,11 +167,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.name}
               href={item.href}
-              className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150"
+              className="flex flex-col items-center gap-1 p-1 flex-1 min-w-0 transition-all duration-150"
               style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
             >
-              <item.icon className="w-6 h-6" />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <item.icon className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-medium leading-none truncate w-full text-center">
+                {item.name}
+              </span>
             </Link>
           );
         })}

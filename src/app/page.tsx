@@ -13,6 +13,7 @@ import { doc, onSnapshot, getDocs, collection, query, where } from 'firebase/fir
 import { db } from '@/lib/firebase/config';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { sortTasksWithinDate } from '@/lib/sorting';
 
 export default function DashboardPage() {
   const { user, userData } = useAuth();
@@ -131,17 +132,15 @@ export default function DashboardPage() {
       (t.repeatType === 'once' && t.targetDate === todayStr)
     );
 
-  // Sorting newest first for pending tasks
+  // Sorting based on global rule: Priority -> Required -> Alphabetical
   const pendingTasks = tasksForToday
     .filter((t) => !todayLogs.has(t.id))
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort(sortTasksWithinDate);
   
-  // Sorting Logs newest first by the log creation time
-  // But actedTasks are tasks... let's combine and sort by log createdAt
   const actedTasksWithLogs = tasksForToday
     .filter(t => todayLogs.has(t.id))
     .map(t => ({ task: t, log: todayLogs.get(t.id)! }))
-    .sort((a, b) => (b.log.createdAt || 0) - (a.log.createdAt || 0));
+    .sort(sortTasksWithinDate);
 
   const statusMeta = (log: DailyLog) => {
     if (log.itemType === 'event') {
@@ -160,12 +159,13 @@ export default function DashboardPage() {
         {/* ── Stats ────────────────────────────────────── */}
         <div className="w-full">
           {/* Points */}
-          <div
-            className="rounded-2xl p-6"
-            style={{ background: 'linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%)' }}
-          >
-            <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Total Points</p>
-            <p className="text-4xl font-bold mt-1 text-white tracking-tight">{totalPoints}</p>
+          <div className="flex items-baseline gap-2 pb-2">
+            <h1 className="text-5xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {totalPoints}
+            </h1>
+            <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              Total Points
+            </span>
           </div>
         </div>
 
