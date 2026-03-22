@@ -43,12 +43,14 @@ export default function CalendarPage() {
       try {
         const q = query(
           collection(db, 'logs'),
-          where('userId', '==', user.uid),
-          where('date', '>=', startStr),
-          where('date', '<=', endStr)
+          where('userId', '==', user.uid)
         );
         const snaps = await getDocs(q);
-        setLogs(snaps.docs.map((d) => d.data() as DailyLog));
+        const allLogs = snaps.docs.map((d) => d.data() as DailyLog);
+        
+        // Filter client-side to avoid composite index requirement errors
+        const filtered = allLogs.filter(l => l.date >= startStr && l.date <= endStr);
+        setLogs(filtered);
       } catch {
         toast.error('Failed to load calendar data');
       } finally {
