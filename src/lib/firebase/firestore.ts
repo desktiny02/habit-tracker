@@ -65,15 +65,51 @@ export const createTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {
   return newTask;
 };
 
+export const updateTask = async (taskId: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'userId'>>) => {
+  const taskRef = doc(db, 'tasks', taskId);
+  await updateDoc(taskRef, updates);
+};
+
 export const getUserTasks = async (userId: string) => {
   const q = query(collection(db, 'tasks'), where('userId', '==', userId));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(d => d.data() as Task);
 };
 
-export const deleteTask = async (taskId: string) => {
-  const { deleteDoc } = await import('firebase/firestore');
-  await deleteDoc(doc(db, 'tasks', taskId));
+export const deleteTask = async (taskId: string, userId?: string) => {
+  const { deleteDoc, writeBatch } = await import('firebase/firestore');
+  
+  // Also delete all logs associated with this task
+  if (userId) {
+    const qLogs = query(collection(db, 'logs'), where('userId', '==', userId), where('taskId', '==', taskId));
+    const logsSnap = await getDocs(qLogs);
+    
+    let pointsOffset = 0;
+    const batch = writeBatch(db);
+    
+    for (const d of logsSnap.docs) {
+      const data = d.data() as DailyLog;
+      pointsOffset -= data.pointsAwarded || 0; 
+      batch.delete(d.ref);
+    }
+    
+    // Delete the task itself
+    batch.delete(doc(db, 'tasks', taskId));
+    
+    // Apply points offset
+    if (pointsOffset !== 0) {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+         const currentPoints = (userSnap.data() as UserData).totalPoints || 0;
+         batch.update(userRef, { totalPoints: Math.max(0, currentPoints + pointsOffset) });
+      }
+    }
+    
+    await batch.commit();
+  } else {
+    await deleteDoc(doc(db, 'tasks', taskId));
+  }
 };
 
 // Cancel an event/task. If recurring, we might want to delete it or disable it.

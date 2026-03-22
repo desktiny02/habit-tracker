@@ -1,21 +1,27 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/firebase/auth';
-import { createTask } from '@/lib/firebase/firestore';
-import { Priority, PRIORITY_CONFIG } from '@/types';
+import { updateTask } from '@/lib/firebase/firestore';
+import { Priority, PRIORITY_CONFIG, Task } from '@/types';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
-export default function NewTaskPage() {
+export default function EditTaskPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { id } = useParams() as { id: string };
+
+  const [loadingTask, setLoadingTask] = useState(true);
+  
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState('');
@@ -23,9 +29,53 @@ export default function NewTaskPage() {
   const [required, setRequired] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const [repeatType, setRepeatType] = useState<'today' | 'once' | 'weekly' | 'daily'>('today');
-  const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [repeatType, setRepeatType] = useState<'today' | 'once' | 'weekly' | 'daily'>('daily');
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
+  useEffect(() => {
+    if (!user || !id) return;
+    const fetchTask = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'tasks', id));
+        if (!snap.exists()) {
+          toast.error('Task not found');
+          router.push('/');
+          return;
+        }
+        const data = snap.data() as Task;
+        if (data.userId !== user.uid || data.itemType !== 'task') {
+          router.push('/');
+          return;
+        }
+        
+        setName(data.name || '');
+        setDescription(data.description || '');
+        setPoints(String(data.points || 0));
+        setPriority(data.priority || 'medium');
+        setRequired(!!data.required);
+        
+        // Handle repeatType mappings
+        if (data.repeatType === 'once') {
+           if (data.targetDate === format(new Date(), 'yyyy-MM-dd')) {
+             setRepeatType('today');
+           } else {
+             setRepeatType('once');
+           }
+           setTargetDate(data.targetDate || format(new Date(), 'yyyy-MM-dd'));
+        } else {
+           setRepeatType(data.repeatType);
+        }
+        
+        setRepeatDays(data.repeatDays || []);
+      } catch (err) {
+        toast.error('Error loading task');
+      } finally {
+        setLoadingTask(false);
+      }
+    };
+    fetchTask();
+  }, [user, id, router]);
 
   const toggleDay = (dayIndex: number) => {
     setRepeatDays(prev =>
@@ -53,43 +103,54 @@ export default function NewTaskPage() {
 
     setLoading(true);
     try {
-      await createTask({
-        userId: user.uid,
-        itemType: 'task',
+      await updateTask(id, {
         name,
         description,
         points: pts,
         priority,
         required,
         repeatType: finalRepeatType,
-        ...(finalRepeatType === 'weekly' ? { repeatDays } : {}),
-        ...(finalRepeatType === 'once' ? { targetDate: finalTargetDate } : {}),
+        ...(finalRepeatType === 'weekly' ? { repeatDays } : { repeatDays: [] }),
+        ...(finalRepeatType === 'once' ? { targetDate: finalTargetDate } : { targetDate: '' }),
       });
-      toast.success('Task created!');
-      router.push('/');
+      toast.success('Task updated!');
+      router.back();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create task');
+      toast.error(err instanceof Error ? err.message : 'Failed to update task');
     } finally {
       setLoading(false);
     }
   };
 
+  if (loadingTask) {
+    return (
+      <AppLayout>
+        <div className="flex justify-center py-16">
+          <div
+            className="w-8 h-8 rounded-full border-[3px] animate-spin"
+            style={{ borderColor: 'var(--bg-raised)', borderTopColor: 'var(--accent)' }}
+          />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="max-w-md mx-auto">
         <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70 cursor-pointer"
             style={{ color: 'var(--text-secondary)' }}
           >
             <ArrowLeft style={{ width: 16, height: 16 }} />
-            Back to Dashboard
-          </Link>
+            Back
+          </button>
         </div>
 
         <h1 className="text-2xl font-bold mb-7" style={{ color: 'var(--text-primary)' }}>
-          New Task
+          Edit Task
         </h1>
 
         <form
@@ -157,9 +218,6 @@ export default function NewTaskPage() {
                 );
               })}
             </div>
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              Higher priority → bigger penalty if missed.
-            </p>
           </div>
 
           {/* Required toggle */}
@@ -246,7 +304,6 @@ export default function NewTaskPage() {
                   required
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
                 />
               </div>
             )}
@@ -262,18 +319,14 @@ export default function NewTaskPage() {
               required
               min="1"
               max="1000"
-              placeholder="e.g. 50"
               value={points}
               onChange={(e) => setPoints(e.target.value)}
             />
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              1–1000 pts per completion.
-            </p>
           </div>
 
           <div className="pt-2">
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? 'Creating…' : 'Create Task'}
+              {loading ? 'Saving…' : 'Save Changes'}
             </Button>
           </div>
         </form>

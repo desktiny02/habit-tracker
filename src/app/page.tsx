@@ -90,7 +90,8 @@ export default function DashboardPage() {
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      await deleteTask(taskId);
+      if (!user) return;
+      await deleteTask(taskId, user.uid);
       setTasks(prev => prev.filter(t => t.id !== taskId));
       toast.success('Removed successfully');
     } catch {
@@ -157,15 +158,29 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="space-y-8">
         {/* ── Stats ────────────────────────────────────── */}
-        <div className="w-full">
-          {/* Points */}
-          <div className="flex items-baseline gap-2 pb-2">
-            <h1 className="text-5xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              {totalPoints}
-            </h1>
-            <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              Total Points
-            </span>
+        <div className="w-full relative overflow-hidden rounded-[2rem] p-8 md:p-10 text-white"
+          style={{
+            background: 'linear-gradient(135deg, rgba(99,102,241,1) 0%, rgba(139,92,246,1) 100%)',
+            boxShadow: '0 12px 30px -10px rgba(99,102,241,0.5)',
+          }}
+        >
+          {/* Decorative shapes */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl -mt-20 -mr-20 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-400 opacity-20 rounded-full blur-2xl -mb-10 -ml-10 pointer-events-none" />
+
+          <div className="relative z-10">
+            <h2 className="text-sm md:text-base font-bold uppercase tracking-widest text-white/80 mb-2">
+              Available Balance
+            </h2>
+            <div className="flex items-baseline gap-3">
+              <span className="text-6xl md:text-7xl font-extrabold tracking-tight drop-shadow-md">
+                {totalPoints}
+              </span>
+              <span className="text-xl md:text-2xl font-bold opacity-80">pts</span>
+            </div>
+            <p className="mt-4 text-sm md:text-base text-white/90 font-medium">
+              Keep completing habits to grow your rewards!
+            </p>
           </div>
         </div>
 

@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Trash2, X, Calendar, Repeat, CalendarClock } from 'lucide-react';
 import { sortTasksWithinDate } from '@/lib/sorting';
+import { deleteTask } from '@/lib/firebase/firestore';
 
 export default function UpcomingPage() {
   const { user } = useAuth();
@@ -53,7 +54,9 @@ export default function UpcomingPage() {
   const handleDelete = async (itemId: string) => {
     setDeletingId(itemId);
     try {
-      await deleteDoc(doc(db, 'tasks', itemId));
+      if (user) {
+        await deleteTask(itemId, user.uid);
+      }
       setItems(prev => prev.filter(i => i.id !== itemId));
       setConfirmDeleteId(null);
       toast.success('Removed successfully');

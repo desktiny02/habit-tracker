@@ -169,41 +169,33 @@ export default function CalendarPage() {
                 const isCurrentDay = isToday(day);
                 const isSelected = selectedDay && isSameDay(day, selectedDay);
 
+                const tasksCount = dayItems.filter(i => i.task.itemType !== 'event').length;
+                const eventsCount = dayItems.filter(i => i.task.itemType === 'event').length;
+
                 return (
                   <button
                     key={day.toISOString()}
                     onClick={() => setSelectedDay(day)}
-                    className="aspect-square p-1 rounded-xl flex flex-col items-center justify-between transition-colors cursor-pointer hover:opacity-80 relative"
+                    className="aspect-square p-1 rounded-xl flex flex-col items-center transition-colors cursor-pointer hover:opacity-80 relative overflow-hidden"
                     style={{
                       backgroundColor: isCurrentMonthDay ? 'var(--bg-raised)' : 'transparent',
                       opacity: isCurrentMonthDay ? 1 : 0.35,
-                      border: isSelected ? '2px solid var(--accent)' : '2px solid transparent',
+                      border: isSelected ? '2px solid var(--accent)' : isCurrentDay ? '2px solid rgba(255, 255, 255, 0.4)' : '2px solid transparent',
                     }}
                   >
-                    {isCurrentDay && (
-                      <span 
-                        className="absolute inset-x-0 -top-1 mx-auto block w-1.5 h-1.5 rounded-full" 
-                        style={{ backgroundColor: 'var(--accent)' }} 
-                      />
-                    )}
                     <span
-                      className="text-xs font-medium mt-1"
+                      className="text-xs font-bold mt-1"
                       style={{ color: isCurrentDay || isSelected ? 'var(--accent)' : 'var(--text-secondary)' }}
                     >
                       {format(day, 'd')}
                     </span>
-                    <div className="flex flex-wrap gap-0.5 justify-center mt-auto mb-1 px-1">
-                      {dayItems.length > 0 && (
-                        <span 
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                          style={{
-                             backgroundColor: 'var(--accent-subtle)',
-                             color: 'var(--accent)'
-                          }}
-                        >
-                          {dayItems.length} {dayItems.length === 1 ? 'item' : 'items'}
-                        </span>
-                      )}
+                    <div className="flex flex-wrap gap-[3px] justify-center mt-auto mb-1.5 px-0.5 w-full">
+                      {Array.from({ length: tasksCount }).map((_, i) => (
+                         <div key={`t-${i}`} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
+                      ))}
+                      {Array.from({ length: eventsCount }).map((_, i) => (
+                         <div key={`e-${i}`} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#eab308' /* Gold rounded */ }} />
+                      ))}
                     </div>
                   </button>
                 );
