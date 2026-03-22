@@ -4,9 +4,10 @@ import { useAuth } from '@/lib/firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon, BarChart3, HelpCircle } from 'lucide-react';
-import { auth } from '@/lib/firebase/config';
+import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon, BarChart3, HelpCircle, User as UserIcon } from 'lucide-react';
+import { auth, db } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -15,6 +16,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  const [username, setUsername] = useState('User');
+  const [bkkTime, setBkkTime] = useState('');
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) setUsername(snap.data().username || 'User');
+    });
+    return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    const tick = () => {
+      const bkk = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Bangkok',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: true,
+        month: 'short',
+        day: 'numeric',
+      }).format(new Date());
+      setBkkTime(bkk);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
@@ -58,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }}
       >
         {/* Logo */}
-        <div className="px-6 pt-6 pb-4">
+        <div className="px-5 pt-6 pb-4">
           <Link
             href="/"
             className="flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80"
@@ -67,6 +97,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <CheckSquare className="w-5 h-5" />
             Habit Tracker
           </Link>
+          <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+            BKK: {bkkTime}
+          </div>
+        </div>
+
+        {/* User Card */}
+        <div className="px-4 mb-3">
+          <div className="flex items-center gap-2.5 bg-[var(--bg-raised)] p-2.5 rounded-xl border border-[var(--border)]">
+            <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm">
+              {username.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold truncate text-[var(--text-primary)]">@{username}</p>
+              <p className="text-[9px] text-[var(--text-muted)] font-medium">Tracking active</p>
+            </div>
+          </div>
         </div>
 
         {/* Nav */}
