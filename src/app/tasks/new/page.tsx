@@ -11,6 +11,7 @@ import { Priority, PRIORITY_CONFIG } from '@/types';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 export default function NewTaskPage() {
   const { user } = useAuth();
@@ -24,7 +25,7 @@ export default function NewTaskPage() {
 
   const [repeatType, setRepeatType] = useState<'daily' | 'weekly' | 'once'>('daily');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [targetDate, setTargetDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   const toggleDay = (dayIndex: number) => {
     setRepeatDays(prev =>
@@ -241,7 +242,7 @@ export default function NewTaskPage() {
                   required
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={format(new Date(), 'yyyy-MM-dd')}
                 />
               </div>
             )}

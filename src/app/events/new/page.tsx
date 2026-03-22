@@ -10,6 +10,7 @@ import { createTask } from '@/lib/firebase/firestore';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 export default function NewEventPage() {
   const { user } = useAuth();
@@ -17,7 +18,7 @@ export default function NewEventPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [targetDate, setTargetDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +114,7 @@ export default function NewEventPage() {
               required
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]} // no past dates if you want
+              min={format(new Date(), 'yyyy-MM-dd')} // no past dates if you want
             />
           </div>
 
