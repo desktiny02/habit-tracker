@@ -102,10 +102,16 @@ export default function DashboardPage() {
   };
 
   const [undoLoading, setUndoLoading] = useState<string | null>(null);
+  const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
 
   const handleUndoLog = async (taskId: string, logId: string) => {
     if (!user) return;
+    if (confirmUndoId !== taskId) {
+      setConfirmUndoId(taskId);
+      return;
+    }
     setUndoLoading(taskId);
+    setConfirmUndoId(null);
     try {
       await deleteDailyLog(user.uid, logId);
       setTodayLogs((prev) => {
@@ -296,23 +302,43 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       {!isEvent && meta.sign && (
                          <span className="text-xs font-bold whitespace-nowrap" style={{ color: meta.color }}>
                            {meta.sign} pts
                          </span>
                       )}
-                      <button
-                        onClick={() => handleUndoLog(task.id, log.id)}
-                        disabled={undoLoading === task.id}
-                        className="p-1.5 rounded-full hover:bg-[var(--bg-raised)] transition-colors cursor-pointer group disabled:opacity-50"
-                        title="Undo log"
-                      >
-                        <RotateCcw 
-                          style={{ width: 14, height: 14, color: 'var(--text-muted)' }} 
-                          className={`group-hover:text-[var(--text-primary)] transition-colors ${undoLoading === task.id ? 'animate-spin' : ''}`} 
-                        />
-                      </button>
+                      
+                      {confirmUndoId === task.id ? (
+                        <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-right-1 duration-150">
+                          <button
+                            onClick={() => setConfirmUndoId(null)}
+                            className="p-1 rounded-md text-[10px] font-bold uppercase transition-colors"
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleUndoLog(task.id, log.id)}
+                            disabled={undoLoading === task.id}
+                            className="p-1 px-1.5 rounded-md text-[10px] font-bold uppercase bg-[var(--danger)] text-white shadow-sm"
+                          >
+                            {undoLoading === task.id ? '...' : 'Undo'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleUndoLog(task.id, log.id)}
+                          disabled={undoLoading === task.id}
+                          className="p-1.5 rounded-full hover:bg-[var(--bg-raised)] transition-colors cursor-pointer group disabled:opacity-50"
+                          title="Undo log"
+                        >
+                          <RotateCcw 
+                            style={{ width: 14, height: 14, color: 'var(--text-muted)' }} 
+                            className={`group-hover:text-[var(--text-primary)] transition-colors ${undoLoading === task.id ? 'animate-spin' : ''}`} 
+                          />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

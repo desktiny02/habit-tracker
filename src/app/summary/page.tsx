@@ -11,7 +11,6 @@ import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
 interface WeekStats {
   totalDone: number;
   totalMissed: number;
-  totalSkipped: number;
   totalScheduled: number;
   pointsEarned: number;
   pointsLost: number;
@@ -48,7 +47,7 @@ export default function SummaryPage() {
         const snaps = await getDocs(q);
         const logs = snaps.docs.map(d => d.data() as DailyLog);
 
-        let totalDone = 0, totalMissed = 0, totalSkipped = 0;
+        let totalDone = 0, totalMissed = 0;
         let pointsEarned = 0, pointsLost = 0;
 
         for (const log of logs) {
@@ -56,13 +55,12 @@ export default function SummaryPage() {
           
           if (log.status === 'done') { totalDone++; pointsEarned += log.pointsAwarded; }
           else if (log.status === 'missed') { totalMissed++; pointsLost += Math.abs(log.pointsAwarded); }
-          else { totalSkipped++; }
         }
 
-        const totalScheduled = totalDone + totalMissed + totalSkipped;
+        const totalScheduled = totalDone + totalMissed;
         const completionRate = totalScheduled > 0 ? Math.round((totalDone / totalScheduled) * 100) : 0;
 
-        setStats({ totalDone, totalMissed, totalSkipped, totalScheduled, pointsEarned, pointsLost, completionRate });
+        setStats({ totalDone, totalMissed, totalScheduled, pointsEarned, pointsLost, completionRate });
       } catch {
         // Silent fail — page still renders
       } finally {
@@ -139,7 +137,7 @@ export default function SummaryPage() {
           {/* Task breakdown */}
           <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
             <h2 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>Task Breakdown</h2>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <p className="text-3xl font-bold" style={{ color: 'var(--success)' }}>{stats.totalDone}</p>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Done</p>
@@ -147,10 +145,6 @@ export default function SummaryPage() {
               <div>
                 <p className="text-3xl font-bold" style={{ color: 'var(--danger)' }}>{stats.totalMissed}</p>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Missed</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold" style={{ color: 'var(--text-muted)' }}>{stats.totalSkipped}</p>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Skipped</p>
               </div>
             </div>
           </div>
