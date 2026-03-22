@@ -281,7 +281,9 @@ export default function RewardsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rewards.map((reward) => (
+          {[...rewards]
+            .sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name))
+            .map((reward) => (
             <RewardCard
               key={reward.id}
               reward={reward}

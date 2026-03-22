@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState } from 'react';
-import { DailyLog } from '@/types';
+import { DailyLog, Task } from '@/types';
 import { db } from '@/lib/firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import {
@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 export default function CalendarPage() {
   const { user } = useAuth();
   const [logs, setLogs] = useState<DailyLog[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -32,38 +33,75 @@ export default function CalendarPage() {
   const prevMonth = () => { setCurrentMonth(subMonths(currentMonth, 1)); setSelectedDay(null); };
   const nextMonth = () => { setCurrentMonth(addMonths(currentMonth, 1)); setSelectedDay(null); };
 
-  // Fetch logs scoped to current month only (performance fix)
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  // Fetch logs and tasks scoped to current month
   useEffect(() => {
     if (!user) return;
     setLoading(true);
     const startStr = format(startOfWeek(monthStart), 'yyyy-MM-dd');
     const endStr = format(endOfWeek(monthEnd), 'yyyy-MM-dd');
 
-    const loadLogs = async () => {
+    const loadData = async () => {
       try {
-        const q = query(
-          collection(db, 'logs'),
-          where('userId', '==', user.uid)
-        );
-        const snaps = await getDocs(q);
-        const allLogs = snaps.docs.map((d) => d.data() as DailyLog);
+        const qLogs = query(collection(db, 'logs'), where('userId', '==', user.uid));
+        const qTasks = query(collection(db, 'tasks'), where('userId', '==', user.uid));
         
-        // Filter client-side to avoid composite index requirement errors
-        const filtered = allLogs.filter(l => l.date >= startStr && l.date <= endStr);
-        setLogs(filtered);
+        const [snapsLogs, snapsTasks] = await Promise.all([getDocs(qLogs), getDocs(qTasks)]);
+        
+        const allLogs = snapsLogs.docs.map((d) => d.data() as DailyLog);
+        const allTasks = snapsTasks.docs.map((d) => {
+          const t = d.data() as Task;
+          t.id = d.id;
+          return t;
+        });
+        
+        // Filter logs client-side
+        const filteredLogs = allLogs.filter(l => l.date >= startStr && l.date <= endStr);
+        setLogs(filteredLogs);
+        setTasks(allTasks);
       } catch {
         toast.error('Failed to load calendar data');
       } finally {
         setLoading(false);
       }
     };
-    loadLogs();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentMonth]);
 
-  const getLogsForDay = (day: Date) => {
+  type DayItem = { task: Task; log?: DailyLog };
+
+  const getItemsForDay = (day: Date): DayItem[] => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    return logs.filter((l) => l.date === dateStr);
+    const dayOfWeek = day.getDay();
+    const dayEnd = day.getTime() + 86400000;
+    
+    const scheduledTasks = tasks.filter(t => {
+      if (t.createdAt > dayEnd) return false; // task was created after this day
+      if (t.repeatType === 'daily') return true;
+      if (t.repeatType === 'weekly' && t.repeatDays?.includes(dayOfWeek)) return true;
+      if (t.repeatType === 'once' && t.targetDate === dateStr) return true;
+      return false;
+    });
+
+    const items: DayItem[] = [];
+    for (const task of scheduledTasks) {
+      const log = logs.find(l => l.taskId === task.id && l.date === dateStr);
+      // If past date and no log exists, assume it was cancelled or not applicable, we can skip it.
+      // Unless it's an event, we still render past events. Let's render everything that was scheduled.
+      if (dateStr < todayStr && !log && task.itemType !== 'event') {
+        const cDate = format(new Date(task.createdAt), 'yyyy-MM-dd');
+        // Only skip if there's genuinely no log and it's fully past
+        if (dateStr >= cDate) {
+           // We might include it as "Missed" implicitly if not logged, but let's just push it.
+           items.push({ task });
+        }
+      } else {
+        items.push({ task, log });
+      }
+    }
+    return items;
   };
 
   return (
@@ -126,7 +164,7 @@ export default function CalendarPage() {
             {/* Days grid */}
             <div className="grid grid-cols-7 gap-1">
               {gridDays.map((day) => {
-                const dayLogs = getLogsForDay(day);
+                const dayItems = getItemsForDay(day);
                 const isCurrentMonthDay = day.getMonth() === currentMonth.getMonth();
                 const isCurrentDay = isToday(day);
                 const isSelected = selectedDay && isSameDay(day, selectedDay);
@@ -155,9 +193,15 @@ export default function CalendarPage() {
                       {format(day, 'd')}
                     </span>
                     <div className="flex flex-wrap gap-0.5 justify-center mt-auto mb-1 px-1">
-                      {dayLogs.length > 0 && (
-                        <span className="text-[9px] font-semibold tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                          {dayLogs.length} {dayLogs.length === 1 ? 'item' : 'items'}
+                      {dayItems.length > 0 && (
+                        <span 
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                          style={{
+                             backgroundColor: 'var(--accent-subtle)',
+                             color: 'var(--accent)'
+                          }}
+                        >
+                          {dayItems.length} {dayItems.length === 1 ? 'item' : 'items'}
                         </span>
                       )}
                     </div>
@@ -167,52 +211,99 @@ export default function CalendarPage() {
             </div>
 
             {/* Selected Day Details */}
-            {selectedDay && (
-              <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
-                <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-                  {format(selectedDay, 'EEEE, MMMM d')}
-                </h3>
-                {getLogsForDay(selectedDay).length === 0 ? (
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No items logged on this day.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {getLogsForDay(selectedDay).map(log => {
-                      const isPositive = log.status === 'done';
-                      const isMissed = log.status === 'missed';
-                      const isEvent = log.itemType === 'event';
-                      
-                      let badgeColor = 'var(--text-muted)';
-                      let badgeText = 'Skipped';
-                      
-                      if (isPositive) { badgeColor = 'var(--success)'; badgeText = 'Done'; }
-                      else if (isMissed) { badgeColor = 'var(--danger)'; badgeText = 'Missed'; }
+            {selectedDay && (() => {
+               const dayItems = getItemsForDay(selectedDay);
+               const tasksList = dayItems.filter(i => i.task.itemType !== 'event');
+               const eventsList = dayItems.filter(i => i.task.itemType === 'event');
 
-                      return (
-                        <div key={log.id} className="flex justify-between items-center bg-[var(--bg-raised)] p-3 rounded-lg">
-                          <div className="flex items-center gap-3 min-w-0">
-                             <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: badgeColor }} />
-                             <div className="min-w-0">
-                               <span className="font-medium text-sm block truncate" style={{ color: 'var(--text-primary)' }}>{log.taskName || 'Task'}</span>
-                               <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>
-                                 {isEvent ? 'Event' : 'Task'}
-                               </span>
-                             </div>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                             <span className="text-xs font-bold px-2 py-1 rounded border" style={{ color: badgeColor, borderColor: badgeColor }}>{badgeText}</span>
-                             {!isEvent && (
-                               <span className="text-sm font-bold" style={{ color: isMissed ? 'var(--danger)' : isPositive ? 'var(--success)' : 'var(--text-muted)' }}>
-                                 {log.pointsAwarded > 0 ? `+${log.pointsAwarded}` : log.pointsAwarded} pts
-                               </span>
-                             )}
-                          </div>
+               return (
+                <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+                    {format(selectedDay, 'EEEE, MMMM d')}
+                  </h3>
+                  
+                  {dayItems.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No items scheduled for this day.</p>
+                  ) : (
+                    <div className="space-y-6">
+                      {tasksList.length > 0 && (
+                        <div>
+                           <h4 className="text-xs font-bold uppercase tracking-wider mb-3 block" style={{ color: 'var(--text-secondary)' }}>Tasks</h4>
+                           <div className="space-y-3">
+                             {tasksList.map(item => {
+                               const log = item.log;
+                               let badgeColor = 'var(--text-muted)';
+                               let badgeText = 'Pending';
+                               if (log) {
+                                  if (log.status === 'done') { badgeColor = 'var(--success)'; badgeText = 'Done'; }
+                                  else if (log.status === 'missed') { badgeColor = 'var(--danger)'; badgeText = 'Missed'; }
+                                  else { badgeText = 'Skipped'; }
+                               } else if (format(selectedDay, 'yyyy-MM-dd') < format(new Date(), 'yyyy-MM-dd')) {
+                                  badgeColor = 'var(--danger)';
+                                  badgeText = 'Missed (Unlogged)';
+                               }
+
+                               return (
+                                 <div key={item.task.id} className="flex justify-between items-center bg-[var(--bg-raised)] p-3 rounded-lg border border-[var(--border)]">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: badgeColor }} />
+                                       <div className="min-w-0">
+                                         <span className="font-medium text-sm block truncate" style={{ color: 'var(--text-primary)' }}>{item.task.name}</span>
+                                       </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 shrink-0">
+                                       <span className="text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: `${badgeColor}20`, color: badgeColor }}>{badgeText}</span>
+                                       {log && (
+                                         <span className="text-sm font-bold" style={{ color: log.status === 'done' ? 'var(--success)' : log.status === 'missed' ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                           {log.pointsAwarded > 0 ? `+${log.pointsAwarded}` : log.pointsAwarded} pts
+                                         </span>
+                                       )}
+                                    </div>
+                                 </div>
+                               )
+                             })}
+                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+                      )}
+
+                      {eventsList.length > 0 && (
+                        <div>
+                           <h4 className="text-xs font-bold uppercase tracking-wider mb-3 block" style={{ color: 'var(--text-secondary)' }}>Events</h4>
+                           <div className="space-y-3">
+                             {eventsList.map(item => {
+                               const log = item.log;
+                               let badgeColor = 'var(--accent)';
+                               let badgeText = 'Scheduled';
+                               if (log) {
+                                  if (log.status === 'done') { badgeColor = 'var(--success)'; badgeText = 'Done'; }
+                                  else if (log.status === 'missed') { badgeColor = 'var(--text-muted)'; badgeText = 'Missed'; }
+                               } else if (format(selectedDay, 'yyyy-MM-dd') < format(new Date(), 'yyyy-MM-dd')) {
+                                  badgeColor = 'var(--text-muted)';
+                                  badgeText = 'Past';
+                               }
+
+                               return (
+                                 <div key={item.task.id} className="flex justify-between items-center bg-[var(--bg-surface)] p-3 rounded-lg border border-[var(--accent)] border-opacity-30">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: badgeColor }} />
+                                       <div className="min-w-0">
+                                         <span className="font-medium text-sm block truncate" style={{ color: 'var(--text-primary)' }}>{item.task.name}</span>
+                                       </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 shrink-0">
+                                       <span className="text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: `${badgeColor}15`, color: badgeColor }}>{badgeText}</span>
+                                    </div>
+                                 </div>
+                               )
+                             })}
+                           </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+               );
+            })()}
 
           </>
         )}
