@@ -119,39 +119,37 @@ export default function UpcomingPage() {
         ) : (
           <div className="space-y-3">
           <div className="space-y-8">
-            {(()=>{
-              const grouped = items.reduce((acc, item) => {
-                let g = 'Once';
-                if (item.repeatType === 'daily') g = 'Daily';
-                else if (item.repeatType === 'weekly') g = 'Weekly';
-                else if (item.targetDate) g = item.targetDate; // yyyy-MM-dd
-                if (!acc[g]) acc[g] = [];
-                acc[g].push(item);
-                return acc;
-              }, {} as Record<string, Task[]>);
-      
-              const groupKeys = Object.keys(grouped).sort((a, b) => {
-                if (a === 'Daily') return -1;
-                if (b === 'Daily') return 1;
-                if (a === 'Weekly') return -1;
-                if (b === 'Weekly') return 1;
-                if (a === 'Once') return 1;
-                if (b === 'Once') return -1;
-                return a.localeCompare(b);
-              });
+            {(() => {
+              const { addDays } = require('date-fns');
 
-              return groupKeys.map(k => {
-                grouped[k].sort(sortTasksWithinDate);
-                const title = k === 'Daily' ? 'Daily Habits' 
-                            : k === 'Weekly' ? 'Weekly Habits' 
-                            : k === 'Once' ? 'One-time Items'
-                            : format(new Date(k + 'T12:00:00'), 'EEEE, MMM d, yyyy');
+              const groups = Array.from({ length: 7 }).map((_, i) => {
+                const d = addDays(new Date(), i);
+                const dStr = format(d, 'yyyy-MM-dd');
+                const dayWeight = d.getDay();
+
+                const dItems = items.filter(item => {
+                  if (item.repeatType === 'daily') return true;
+                  if (item.repeatType === 'weekly' && item.repeatDays?.includes(dayWeight)) return true;
+                  if (item.repeatType === 'once' && item.targetDate === dStr) return true;
+                  return false;
+                });
+
+                dItems.sort(sortTasksWithinDate);
+
+                return {
+                  dateStr: dStr,
+                  title: format(d, 'EEEE, MMM d, yyyy'),
+                  items: dItems
+                };
+              }).filter(g => g.items.length > 0);
+
+              return groups.map(g => {
                 return (
-                  <div key={k} className="space-y-3">
+                  <div key={g.dateStr} className="space-y-3">
                     <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-                      {title}
+                      {g.title}
                     </h2>
-                    {grouped[k].map(item => {
+                    {g.items.map(item => {
                       const isEvent = item.itemType === 'event';
                       const pri = isEvent ? null : PRIORITY_CONFIG[item.priority || 'medium'];
                       const Icon = ScheduleIcon(item);

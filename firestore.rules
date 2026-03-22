@@ -18,8 +18,7 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
-        && request.resource.data.totalPoints >= 0
-        && (request.resource.data.totalPoints - resource.data.totalPoints <= 1000);      
+        && request.resource.data.totalPoints >= 0;      
     }
 
     // Usernames lookup Collection

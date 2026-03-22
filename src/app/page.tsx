@@ -111,12 +111,16 @@ export default function DashboardPage() {
     setUndoLoading(taskId);
     setConfirmUndoId(null);
     try {
+      const logToUndo = todayLogs.get(taskId);
+      const points = logToUndo?.pointsAwarded || 0;
+      
       await deleteDailyLog(user.uid, logId);
       setTodayLogs((prev) => {
         const next = new Map(prev);
         next.delete(taskId);
         return next;
       });
+      setTotalPoints(p => Math.max(0, p - points));
       toast.success('Log reversed successfully');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Undo failed');
