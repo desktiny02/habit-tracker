@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon, BarChart3, HelpCircle, User as UserIcon } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon, BarChart3, HelpCircle, User as UserIcon, Sun, Moon } from 'lucide-react';
 import { auth, db } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -14,8 +14,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [theme, setTheme] = useState('dark');
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const saved = localStorage.getItem('theme') || 'dark';
+    setTheme(saved);
+    document.documentElement.setAttribute('data-theme', saved);
+    setMounted(true);
+  }, []);
   const [username, setUsername] = useState('User');
   const [bkkTime, setBkkTime] = useState('');
 
@@ -132,8 +138,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Sign Out */}
-        <div className="p-3 pb-6" style={{ borderTop: '1px solid var(--border)' }}>
+        {/* Sign Out & Theme Toggle */}
+        <div className="p-3 pb-6 space-y-1" style={{ borderTop: '1px solid var(--border)' }}>
+          <button
+            onClick={() => {
+              const next = theme === 'dark' ? 'light' : 'dark';
+              setTheme(next);
+              document.documentElement.setAttribute('data-theme', next);
+              localStorage.setItem('theme', next);
+            }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full text-left transition-all duration-150 hover:opacity-80 cursor-pointer"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {theme === 'dark' ? <Sun style={{ width: 18, height: 18 }} /> : <Moon style={{ width: 18, height: 18 }} />}
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+
           <button
             onClick={() => signOut(auth)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full text-left transition-all duration-150 hover:opacity-80"

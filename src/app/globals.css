@@ -37,6 +37,29 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
 }
 
+html[data-theme="light"] {
+  /* Backgrounds */
+  --bg-base:    #f8fafc;   /* slate 50 */
+  --bg-surface: #ffffff;   /* white */
+  --bg-raised:  #f1f5f9;   /* slate 100 — hover, inputs */
+
+  /* Text */
+  --text-primary:   #0f172a;  /* slate 900 */
+  --text-secondary: #475569;  /* slate 600 */
+  --text-muted:     #94a3b8;  /* slate 400 */
+
+  /* Borders */
+  --border:        rgba(0,0,0,0.06);
+  --border-strong: rgba(0,0,0,0.1);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+
+  /* Accent sub backdrop */
+  --accent-subtle: rgba(99, 102, 241, 0.08);
+}
+
 /* ── Base ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;

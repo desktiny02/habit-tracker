@@ -189,13 +189,13 @@ export default function CalendarPage() {
                     >
                       {format(day, 'd')}
                     </span>
-                    <div className="flex flex-wrap gap-[3px] justify-center mt-auto mb-1.5 px-0.5 w-full">
-                      {Array.from({ length: tasksCount }).map((_, i) => (
-                         <div key={`t-${i}`} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
-                      ))}
-                      {Array.from({ length: eventsCount }).map((_, i) => (
-                         <div key={`e-${i}`} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#eab308' /* Gold rounded */ }} />
-                      ))}
+                    <div className="flex flex-col items-center gap-0 mt-auto mb-1 w-full text-[9px] font-extrabold leading-none tracking-tight">
+                      {tasksCount > 0 && (
+                         <span style={{ color: 'var(--accent)' }}>T: {tasksCount}</span>
+                      )}
+                      {eventsCount > 0 && (
+                         <span style={{ color: '#eab308' }}>E: {eventsCount}</span>
+                      )}
                     </div>
                   </button>
                 );
