@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CheckSquare, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/lib/firebase/auth';
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
@@ -25,6 +26,11 @@ export default function RegisterPage() {
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
   const [usernameReason, setUsernameReason] = useState('');
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) router.push('/');
+  }, [user, authLoading, router]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Real-time username availability check
