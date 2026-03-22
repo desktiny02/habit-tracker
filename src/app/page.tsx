@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [todayLogs, setTodayLogs] = useState<Map<string, DailyLog>>(new Map());
@@ -56,16 +56,12 @@ export default function DashboardPage() {
   }, [todayStr, yesterdayStr]);
 
   useEffect(() => {
-    if (!user) return;
-    const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setTotalPoints(data.totalPoints || 0);
-      }
-    });
+    if (userData) setTotalPoints(userData.totalPoints);
+  }, [userData]);
 
+  useEffect(() => {
+    if (!user) return;
     loadData(user.uid);
-    return () => unsubscribeUser();
   }, [user, loadData]);
 
   const handleAction = async (taskId: string, taskName: string, status: LogStatus, task: Task) => {

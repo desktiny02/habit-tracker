@@ -10,23 +10,18 @@ import { signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
-
   const [username, setUsername] = useState('User');
   const [bkkTime, setBkkTime] = useState('');
 
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) setUsername(snap.data().username || 'User');
-    });
-    return () => unsub();
-  }, [user]);
+    if (userData) setUsername(userData.username || 'User');
+  }, [userData]);
 
   useEffect(() => {
     const tick = () => {

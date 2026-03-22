@@ -3,31 +3,55 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from './config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
+  userData: { totalPoints: number; username: string } | null;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ user: null, userData: null, loading: true });
 
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<{ totalPoints: number; username: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubUser = () => {};
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      setLoading(false);
+      unsubUser(); // clear previous snapshot listener
+
+      if (firebaseUser) {
+        unsubUser = onSnapshot(doc(db, 'users', firebaseUser.uid), (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setUserData({
+              totalPoints: data.totalPoints || 0,
+              username: data.username || 'User',
+            });
+          }
+          setLoading(false);
+        });
+      } else {
+        setUserData(null);
+        setLoading(false);
+      }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      unsubUser();
+    };
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, userData, loading }}>
       <div className="min-h-full h-full flex flex-col">
         {loading ? (
           <div
