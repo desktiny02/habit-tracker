@@ -127,8 +127,9 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
 
               await replyMessage(replyToken, `✅ Added task: "${taskConfig.name}" (${taskConfig.repeatType}) successfully to your dashboard!`);
               continue;
-           } catch (err) {
-              await replyMessage(replyToken, `⚠️ Received: "${textMessage}". Adding it failed on parsing error. Log standard items manually if issue persists.`);
+           } catch (err: unknown) {
+              const errMsg = err instanceof Error ? err.message : 'Unknown error';
+              await replyMessage(replyToken, `⚠️ Received: "${textMessage}". AI parsing failed: ${errMsg}`);
               continue;
            }
         }
@@ -139,7 +140,9 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Unknown total crash';
     console.error('[LINE Webhook] Error:', err);
-    return new Response('Error', { status: 500 });
+    // Note: We cannot rely on replyToken here if parse failed entirely.
+    return new Response(`Error: ${errMsg}`, { status: 500 });
   }
 }
