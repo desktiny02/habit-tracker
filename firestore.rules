@@ -17,7 +17,7 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'linePin', 'lineUserId'])
         && request.resource.data.totalPoints >= 0;      
     }
 
