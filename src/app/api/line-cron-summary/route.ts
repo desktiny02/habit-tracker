@@ -1,0 +1,89 @@
+import { NextResponse } from 'next/server';
+import { dbAdmin } from '@/lib/firebase/admin';
+import { format } from 'date-fns';
+
+const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+
+// LINE Push message utility
+async function pushMessage(to: string, text: string) {
+  return fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+    },
+    body: JSON.stringify({
+      to,
+      messages: [{ type: 'text', text }],
+    }),
+  });
+}
+
+export async function GET(req: Request) {
+  // 1. Verify Vercel Cron Authorization header to prevent public spam triggering
+  const authHeader = req.headers.get('Authorization');
+  if (process.env.NODE_ENV === 'production' && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  try {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const currentDay = today.getDay(); // 0-6 (Sun-Sat)
+
+    // 2. Fetch all users that have connected a LINE account
+    const usersSnap = await dbAdmin.collection('users').where('lineUserId', '>=', '').get();
+
+    let pushCount = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const uData = userDoc.data();
+      const lineUserId = uData.lineUserId;
+      const username = uData.username || 'User';
+
+      if (!lineUserId) continue;
+
+      // 3. Fetch all tasks/events for this user
+      const tasksSnap = await dbAdmin.collection('tasks')
+        .where('userId', '==', userDoc.id)
+        .get();
+
+      const activeToday: string[] = [];
+
+      for (const tDoc of tasksSnap.docs) {
+        const task = tDoc.data();
+
+        let isToday = false;
+        if (task.repeatType === 'daily') {
+          isToday = true;
+        } else if (task.repeatType === 'weekly' && Array.isArray(task.repeatDays)) {
+          isToday = task.repeatDays.includes(currentDay);
+        } else if (task.repeatType === 'once' && task.targetDate === todayStr) {
+          isToday = true;
+        }
+
+        if (isToday) {
+          const typeEmoji = task.itemType === 'event' ? '🗓️' : '✅';
+          const priorityLabel = task.priority ? `[${task.priority.toUpperCase()}]` : '';
+          activeToday.push(`${typeEmoji} ${task.name} ${priorityLabel}`);
+        }
+      }
+
+      // 4. SendPush Notification if there are items today
+      if (activeToday.length > 0) {
+        const messageText = `☀️ Good morning, ${username}!\nHere is your schedule for today (${format(today, 'dd MMM')}):\n\n` + 
+                            activeToday.map((item, index) => `${index + 1}. ${item}`).join('\n') +
+                            `\n\n Have a productive day! 🚀`;
+
+        await pushMessage(lineUserId, messageText);
+        pushCount++;
+      }
+    }
+
+    return NextResponse.json({ success: true, usersPushed: pushCount });
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Unknown Cron Error';
+    console.error('[LINE Cron] Failed:', err);
+    return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
+  }
+}
