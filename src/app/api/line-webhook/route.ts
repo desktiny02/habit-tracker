@@ -82,7 +82,7 @@ export async function POST(req: Request) {
            const userDoc = userSnap.docs[0];
 
            try {
-              const GEMINI_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+              const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
               
               const prompt = `You are an AI task extractor. Parse this message: "${textMessage}". 
 Today is ${new Date().toISOString().split('T')[0]}.
