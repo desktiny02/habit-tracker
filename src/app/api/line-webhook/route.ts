@@ -93,7 +93,7 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({
                     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generation_config: { temperature: 0.1, response_mime_type: 'application/json' }
+                    generation_config: { temperature: 0.1 }
                  })
               });
 
