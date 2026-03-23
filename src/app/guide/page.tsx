@@ -2,6 +2,9 @@
 
 import AppLayout from '@/components/layout/AppLayout';
 import { CheckCircle, Calendar, Gift, Clock, History, BarChart3, Zap, AlertTriangle } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { useAuth } from '@/lib/firebase/auth';
+import { db } from '@/lib/firebase/config';
 
 const sections = [
   {
@@ -72,17 +75,57 @@ const sections = [
 ];
 
 export default function GuidePage() {
+  const { user, userData } = useAuth();
+  const pinGeneratedRef = useRef(false);
+
+  useEffect(() => {
+    if (user && userData && !userData.linePin && !pinGeneratedRef.current) {
+      pinGeneratedRef.current = true;
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+         updateDoc(doc(db, 'users', user.uid), {
+            linePin: Math.random().toString().split('.')[1].slice(0, 6)
+         }).catch(console.error);
+      });
+    }
+  }, [user, userData]);
+
   return (
     <AppLayout>
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-extrabold tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>
-          Guide & Documentation
+           Guide & Documentation
         </h1>
         <p className="text-sm font-medium mb-10" style={{ color: 'var(--text-muted)' }}>
-          Quick, simple answers on how to get the most out of your tracker.
+           Quick, simple answers on how to get the most out of your tracker.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* LINE Integration Widget */}
+        {userData && !userData.lineUserId && (
+          <div className="rounded-3xl p-6 shadow-md mb-8 relative overflow-hidden transition-all duration-300 border border-transparent"
+             style={{
+               backgroundColor: 'var(--bg-surface)',
+               border: '1px solid var(--border-strong)'
+             }}
+          >
+             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                   <h3 className="text-lg font-extrabold flex items-center gap-2" style={{ color: 'var(--accent)' }}>
+                      Connect LINE Bot 🤖
+                   </h3>
+                   <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      Text <span className="font-bold text-emerald-400 px-1.5 py-0.5 bg-raised rounded">Link {userData.linePin || '...'}</span> directly to your LINE Official Account to enable natural AI logging!
+                   </p>
+                </div>
+                <div className="shrink-0">
+                   <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-4 py-2.5 rounded-xl text-white font-bold text-sm text-center shadow-lg shadow-green-500/20">
+                      Waiting for linking...
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
           {sections.map((section) => (
             <div
               key={section.title}
