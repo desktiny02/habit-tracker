@@ -98,10 +98,22 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
               });
 
               const resJson = await aiRes.json();
-              const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-              const taskConfig = JSON.parse(textContent);
+              if (resJson.error) {
+                 throw new Error(`Gemini API Error: ${resJson.error.message}`);
+              }
 
-              if (!taskConfig.name) throw new Error('Could not resolve task name.');
+              const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (!textContent) {
+                 throw new Error('AI Candidate text is empty. Check your prompt or context limits.');
+              }
+
+              // Strip down markdown backticks like ```json if Gemini included them
+              const cleanJson = textContent.replace(/```json|```/g, '').trim();
+              const taskConfig = JSON.parse(cleanJson);
+
+              if (!taskConfig.name) {
+                 throw new Error(`Name missing. AI response was: ${cleanJson.slice(0, 100)}`);
+              }
 
               await dbAdmin.collection('tasks').add({
                  userId: userDoc.id,
