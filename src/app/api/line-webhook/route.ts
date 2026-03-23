@@ -115,7 +115,10 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
                  throw new Error(`Name missing. AI response was: ${cleanJson.slice(0, 100)}`);
               }
 
-              await dbAdmin.collection('tasks').add({
+              const taskRef = dbAdmin.collection('tasks').doc();
+
+              await taskRef.set({
+                 id: taskRef.id,
                  userId: userDoc.id,
                  itemType: taskConfig.itemType || 'task',
                  name: taskConfig.name,
