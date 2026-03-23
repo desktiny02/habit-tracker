@@ -88,7 +88,7 @@ export async function POST(req: Request) {
 Today is ${new Date().toISOString().split('T')[0]}.
 Return a JSON object: { "itemType": "task"|"event", "name": "...", "description": "...", "points": number, "priority": "high"|"medium"|"low", "required": boolean, "repeatType": "daily"|"weekly"|"once", "repeatDays": number[] (0-6 Sun-Sat, only if weekly), "targetDate": "YYYY-MM-DD" (only if once) }`;
 
-              const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+              const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({
