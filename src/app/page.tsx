@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, deleteDailyLog } from '@/lib/firebase/firestore';
 import { Task, LogStatus, DailyLog } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState(0);
+  const pinGeneratedRef = useRef(false);
 
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const yesterdayStr = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
@@ -159,7 +160,8 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    if (user && userData && !userData.linePin) {
+    if (user && userData && !userData.linePin && !pinGeneratedRef.current) {
+      pinGeneratedRef.current = true;
       import('firebase/firestore').then(({ doc, updateDoc }) => {
          updateDoc(doc(db, 'users', user.uid), {
             linePin: Math.random().toString().split('.')[1].slice(0, 6)
