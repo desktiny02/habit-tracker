@@ -7,7 +7,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
-  userData: { totalPoints: number; username: string } | null;
+  userData: { totalPoints: number; username: string; linePin?: string; lineUserId?: string; } | null;
   loading: boolean;
 }
 
@@ -17,7 +17,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userData, setUserData] = useState<{ totalPoints: number; username: string } | null>(null);
+  const [userData, setUserData] = useState<{ totalPoints: number; username: string; linePin?: string; lineUserId?: string; } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,6 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUserData({
               totalPoints: data.totalPoints || 0,
               username: data.username || 'User',
+              linePin: data.linePin,
+              lineUserId: data.lineUserId,
             });
           }
           setLoading(false);

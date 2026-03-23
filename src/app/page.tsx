@@ -158,9 +158,45 @@ export default function DashboardPage() {
     return { icon: '→', color: 'var(--text-muted)', sign: '0' };
   };
 
+  useEffect(() => {
+    if (user && userData && !userData.linePin) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+         updateDoc(doc(db, 'users', user.uid), {
+            linePin: Math.random().toString().split('.')[1].slice(0, 6)
+         }).catch(console.error);
+      });
+    }
+  }, [user, userData]);
+
   return (
     <AppLayout>
       <div className="space-y-8">
+        {/* LINE Integration Widget */}
+        {userData && !userData.lineUserId && (
+          <div className="rounded-[1.5rem] p-5 shadow-lg relative overflow-hidden transition-all duration-300"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid var(--border-strong)',
+            }}
+          >
+             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                   <h3 className="text-lg font-extrabold flex items-center gap-2" style={{ color: 'var(--accent)' }}>
+                      Connect LINE Bot 🤖
+                   </h3>
+                   <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      Text <span className="font-bold text-emerald-400 px-1.5 py-0.5 bg-raised rounded">Link {userData.linePin || '...'}</span> to your LINE Official Account to enable natural AI task logging!
+                   </p>
+                </div>
+                <div className="shrink-0">
+                   <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-4 py-2.5 rounded-xl text-white font-bold text-sm text-center shadow-lg shadow-green-500/20">
+                      Waiting for linking...
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
+
         {/* ── Stats ────────────────────────────────────── */}
         <div className="w-full relative overflow-hidden rounded-[2rem] p-8 md:p-10 text-white"
           style={{

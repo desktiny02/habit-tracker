@@ -5,6 +5,8 @@ export interface UserData {
   username: string;
   totalPoints: number;
   createdAt: number;
+  linePin?: string;
+  lineUserId?: string;
 }
 
 // Task Types
