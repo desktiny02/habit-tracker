@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { db } from '@/lib/firebase/config';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { dbAdmin } from '@/lib/firebase/admin';
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
@@ -36,7 +35,6 @@ export async function POST(req: Request) {
 
     const { events } = JSON.parse(rawBody || '{}');
 
-    // LINE "Verify" endpoint sends an empty events list to dry-run test
     const isVerifyPing = Array.isArray(events) && events.length === 0;
 
     if (!isVerifyPing && !validateSignature(rawBody, signature)) {
@@ -52,7 +50,7 @@ export async function POST(req: Request) {
       if (event.type === 'message' && event.message.type === 'text') {
         const textMessage = event.message.text;
         const replyToken = event.replyToken;
-        const userId = event.source.userId; // LINE User ID
+        const userId = event.source.userId;
 
         // LINKAGE PIN TRIGGER: "Link XXXXXX"
         if (textMessage.trim().toUpperCase().startsWith('LINK ')) {
@@ -62,12 +60,11 @@ export async function POST(req: Request) {
              continue;
           }
 
-          const q = query(collection(db, 'users'), where('linePin', '==', pin));
-          const snap = await getDocs(q);
+          const snap = await dbAdmin.collection('users').where('linePin', '==', pin).get();
 
           if (!snap.empty) {
              const userDoc = snap.docs[0];
-             await updateDoc(doc(db, 'users', userDoc.id), {
+             await userDoc.ref.update({
                 lineUserId: userId,
              });
 
@@ -79,15 +76,13 @@ export async function POST(req: Request) {
         }
 
         // ── AI TASK PARSER FOR LINKED USERS ─────────────────────────
-        const userQ = query(collection(db, 'users'), where('lineUserId', '==', userId));
-        const userSnap = await getDocs(userQ);
+        const userSnap = await dbAdmin.collection('users').where('lineUserId', '==', userId).get();
 
         if (!userSnap.empty) {
            const userDoc = userSnap.docs[0];
-           const uData = userDoc.data();
 
            try {
-              const GEMINI_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY; // can use Firebase Key if enabled Gemini
+              const GEMINI_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
               
               const prompt = `You are an AI task extractor. Parse this message: "${textMessage}". 
 Today is ${new Date().toISOString().split('T')[0]}.
@@ -106,12 +101,9 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
               const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
               const taskConfig = JSON.parse(textContent);
 
-              // Validate minimally
               if (!taskConfig.name) throw new Error('Could not resolve task name.');
 
-              // Insert to Firestore
-              const addDocRef = await import('firebase/firestore').then(f => f.addDoc);
-              await addDocRef(collection(db, 'tasks'), {
+              await dbAdmin.collection('tasks').add({
                  userId: userDoc.id,
                  itemType: taskConfig.itemType || 'task',
                  name: taskConfig.name,
@@ -142,7 +134,6 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : 'Unknown total crash';
     console.error('[LINE Webhook] Error:', err);
-    // Note: We cannot rely on replyToken here if parse failed entirely.
     return new Response(`Error: ${errMsg}`, { status: 500 });
   }
 }
