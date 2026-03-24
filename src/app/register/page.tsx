@@ -31,8 +31,8 @@ export default function RegisterPage() {
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!authLoading && user) router.push('/');
-  }, [user, authLoading, router]);
+    if (!authLoading && user && !loading) router.push('/');
+  }, [user, authLoading, loading, router]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Real-time username availability check
