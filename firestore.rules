@@ -64,6 +64,13 @@ service cloud.firestore {
       allow read: if isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
+    // Registration Codes Collection
+    match /registration_codes/{code} {
+      allow get: if isAuthenticated();
+      allow update: if isAuthenticated() 
+        && (!resource.data.used || resource.data.used == false)
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == request.auth.uid;
     }
   }
 }
