@@ -25,14 +25,21 @@ export const lookupEmailByUsername = async (username: string): Promise<string | 
   return snap.data().email as string;
 };
 
-export const createUserProfile = async (uid: string, email: string, username: string): Promise<void> => {
+export const createUserProfile = async (uid: string, email: string, username: string, code: string): Promise<void> => {
   const normalized = normalizeUsername(username);
   const userRef = doc(db, 'users', uid);
   const usernameRef = doc(db, 'usernames', normalized);
+  const codeRef = doc(db, 'registration_codes', code);
 
   await runTransaction(db, async (tx) => {
+    // Check username
     const usernameSnap = await tx.get(usernameRef);
     if (usernameSnap.exists()) throw new Error('Username was taken — please choose a different one.');
+
+    // Check registration code
+    const codeSnap = await tx.get(codeRef);
+    if (!codeSnap.exists()) throw new Error('Invalid registration code.');
+    if (codeSnap.data()?.used === true) throw new Error('This registration code has already been used.');
 
     const profile: UserData = {
       id: uid,
@@ -41,8 +48,15 @@ export const createUserProfile = async (uid: string, email: string, username: st
       totalPoints: 0,
       createdAt: Date.now(),
     };
+    
+    // Update collections
     tx.set(userRef, profile);
     tx.set(usernameRef, { uid, email, username: normalized });
+    tx.update(codeRef, {
+      used: true,
+      usedBy: uid,
+      usedAt: new Date().toISOString()
+    });
   });
 };
 

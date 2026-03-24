@@ -22,7 +22,9 @@ export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode]         = useState('');
   const [loading, setLoading]   = useState(false);
+
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
   const [usernameReason, setUsernameReason] = useState('');
   const router = useRouter();
@@ -75,6 +77,11 @@ export default function RegisterPage() {
       toast.error(usernameReason || 'Please choose a valid, available username.');
       return;
     }
+    const trimmedCode = code.trim();
+    if (!trimmedCode || trimmedCode.length !== 8) {
+      toast.error('Registration code must be exactly 8 characters.');
+      return;
+    }
     setLoading(true);
     let credential;
     try {
@@ -82,7 +89,7 @@ export default function RegisterPage() {
       // Wait for Auth token propagation
       await new Promise((resolve) => setTimeout(resolve, 800));
       try {
-        await createUserProfile(credential.user.uid, email, username);
+        await createUserProfile(credential.user.uid, email, username, trimmedCode);
         toast.success('Account created! Welcome 🎉');
         router.push('/');
       } catch (profileError: any) {
@@ -247,6 +254,26 @@ export default function RegisterPage() {
               autoComplete="new-password"
               minLength={6}
               onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* Registration Code */}
+          <div>
+            <label
+              className="block text-sm font-medium mb-1.5"
+              htmlFor="reg-code"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Registration Code
+            </label>
+            <Input
+              id="reg-code"
+              type="text"
+              placeholder="8-Digit Code"
+              value={code}
+              maxLength={8}
+              onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
               required
             />
           </div>
