@@ -31,8 +31,9 @@ export async function GET(req: Request) {
     const todayStr = format(today, 'yyyy-MM-dd');
     const currentDay = today.getDay(); // 0-6 (Sun-Sat)
 
-    // 2. Fetch all users that have connected a LINE account
-    const usersSnap = await dbAdmin.collection('users').where('lineUserId', '>=', '').get();
+    // 2. Fetch all users (small set, so we can filter in memory)
+    const usersSnap = await dbAdmin.collection('users').get();
+    console.log(`[LINE Cron] Total users found: ${usersSnap.size}`);
 
     let pushCount = 0;
 
@@ -41,7 +42,12 @@ export async function GET(req: Request) {
       const lineUserId = uData.lineUserId;
       const username = uData.username || 'User';
 
-      if (!lineUserId) continue;
+      if (!lineUserId) {
+        console.log(`[LINE Cron] User ${username} has no lineUserId, skipping.`);
+        continue;
+      }
+
+      console.log(`[LINE Cron] Processing notifications for ${username} (${lineUserId})`);
 
       // 3. Fetch all tasks/events for this user
       const tasksSnap = await dbAdmin.collection('tasks')
@@ -75,8 +81,17 @@ export async function GET(req: Request) {
                             activeToday.map((item, index) => `${index + 1}. ${item}`).join('\n') +
                             `\n\n Have a productive day! 🚀`;
 
-        await pushMessage(lineUserId, messageText);
-        pushCount++;
+        const res = await pushMessage(lineUserId, messageText);
+        
+        if (!res.ok) {
+          const resBody = await res.text();
+          console.error(`[LINE Cron] Failed to send push to ${username}:`, res.status, resBody);
+        } else {
+          console.log(`[LINE Cron] Successfully sent push to ${username}`);
+          pushCount++;
+        }
+      } else {
+        console.log(`[LINE Cron] No active items for ${username} today.`);
       }
     }
 
