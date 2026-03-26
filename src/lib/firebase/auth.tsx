@@ -37,6 +37,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               linePin: data.linePin,
               lineUserId: data.lineUserId,
             });
+          } else {
+            setUserData(null);
           }
           setLoading(false);
         });

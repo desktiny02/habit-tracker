@@ -181,16 +181,31 @@ export const logDailyTask = async (
 
     const userRef = doc(db, 'users', userId);
     const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) throw new Error('User not found.');
+    
+    let currentPoints = 0;
+    if (userSnap.exists()) {
+      currentPoints = (userSnap.data() as UserData).totalPoints || 0;
+    }
 
-    const userData = userSnap.data() as UserData;
-    let newTotalPoints = (userData.totalPoints || 0) + pointsAwarded;
+    let newTotalPoints = currentPoints + pointsAwarded;
     if (newTotalPoints < 0) newTotalPoints = 0;
 
     transaction.set(logRef, newLog);
-    transaction.update(userRef, {
-      totalPoints: newTotalPoints,
-    });
+    
+    if (userSnap.exists()) {
+      transaction.update(userRef, { totalPoints: newTotalPoints });
+    } else {
+      // Auto-create missing profile silently
+      const fallbackUsername = 'User'; // We could fetch from Auth but within transaction we keep it simple
+      const newProfile: UserData = {
+        id: userId,
+        email: '', // will be updated if they re-register or we could skip email
+        username: fallbackUsername,
+        totalPoints: newTotalPoints,
+        createdAt: Date.now()
+      };
+      transaction.set(userRef, newProfile, { merge: true });
+    }
   });
 
   return newLog;
@@ -208,16 +223,15 @@ export const deleteDailyLog = async (userId: string, logId: string) => {
 
     const userRef = doc(db, 'users', userId);
     const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) throw new Error('User not found.');
-
-    const userData = userSnap.data() as UserData;
-    let newTotalPoints = (userData.totalPoints || 0) - pointsAwarded;
-    if (newTotalPoints < 0) newTotalPoints = 0;
+    
+    if (userSnap.exists()) {
+      const userData = userSnap.data() as UserData;
+      let newTotalPoints = (userData.totalPoints || 0) - pointsAwarded;
+      if (newTotalPoints < 0) newTotalPoints = 0;
+      transaction.update(userRef, { totalPoints: newTotalPoints });
+    }
 
     transaction.delete(logRef);
-    transaction.update(userRef, {
-      totalPoints: newTotalPoints,
-    });
   });
 };
 
@@ -305,12 +319,16 @@ export const redeemReward = async (userId: string, reward: Reward) => {
   await runTransaction(db, async (transaction) => {
     const userRef = doc(db, 'users', userId);
     const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) throw new Error('User not found');
-
-    const userData = userSnap.data();
-    if ((userData.totalPoints || 0) < reward.cost) {
-      throw new Error('Insufficient points');
+    
+    let currentPoints = 0;
+    if (userSnap.exists()) {
+      currentPoints = (userSnap.data() as UserData).totalPoints || 0;
     }
+
+    if (currentPoints < reward.cost) {
+      throw new Error(userSnap.exists() ? 'Insufficient points' : 'Insufficient points (Profile not found)');
+    }
+
 
     const redemptionRef = doc(collection(db, 'redemptions'));
     const redemption: Redemption = {
@@ -321,7 +339,7 @@ export const redeemReward = async (userId: string, reward: Reward) => {
     };
 
     transaction.set(redemptionRef, redemption);
-    transaction.update(userRef, { totalPoints: userData.totalPoints - reward.cost });
+    transaction.update(userRef, { totalPoints: currentPoints - reward.cost });
   });
 };
 
