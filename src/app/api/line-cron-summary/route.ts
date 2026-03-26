@@ -19,95 +19,129 @@ async function pushMessage(to: string, text: string) {
   });
 }
 
+// Simple Weather & AQI fetch for Bangkok
+async function getBangkokContext() {
+  try {
+    const weatherRes = await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&current=temperature_2m,weather_code&timezone=Asia%2FBangkok');
+    const aqiRes = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=13.75&longitude=100.50&current=us_aqi');
+    
+    const weatherData = await weatherRes.json();
+    const aqiData = await aqiRes.json();
+
+    const temp = Math.round(weatherData.current?.temperature_2m || 30);
+    const aqi = aqiData.current?.us_aqi || 50;
+    
+    let aqiLabel = 'Good';
+    if (aqi > 150) aqiLabel = 'Unhealthy';
+    else if (aqi > 100) aqiLabel = 'Unhealthy for Sensitive Groups';
+    else if (aqi > 50) aqiLabel = 'Moderate';
+
+    return { temp, aqi, aqiLabel };
+  } catch (err) {
+    return { temp: 30, aqi: 'N/A', aqiLabel: 'Unknown' };
+  }
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const manualKey = searchParams.get('key');
+  const forcedType = searchParams.get('type');
   
-  // 1. Verify Vercel Cron Authorization header OR Manual Key
   const authHeader = req.headers.get('Authorization');
   const cronSecret = process.env.CRON_SECRET;
   
   const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (manualKey === 'HabitAppCronTest'); // Secret fallback for testing
+  const isManualTrigger = (manualKey === 'HabitAppCronTest');
   
   if (process.env.NODE_ENV === 'production' && !isVercelCron && !isManualTrigger) {
-    console.error('[LINE Cron] Attempted access denied (Unauthorized). Headers present:', !!authHeader, 'ManualKey present:', !!manualKey);
-    return new Response('Unauthorized - Access denied.', { status: 401 });
+    return new Response('Unauthorized', { status: 401 });
   }
 
   try {
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
-    const currentDay = today.getDay(); // 0-6 (Sun-Sat)
+    const currentDay = today.getDay();
+    const currentHourUTC = today.getUTCHours();
+    const fullDate = format(today, 'eee, dd MMMM yyyy'); // "Thu, 26 March 2026"
+    
+    const type: 'morning' | 'evening' = (forcedType === 'evening' || (currentHourUTC >= 12 && !forcedType)) 
+      ? 'evening' 
+      : 'morning';
 
-    // 2. Fetch all users (small set, so we can filter in memory)
+    const { temp, aqi, aqiLabel } = await getBangkokContext();
+
     const usersSnap = await dbAdmin.collection('users').get();
-    console.log(`[LINE Cron] Total users found: ${usersSnap.size}`);
-
     let pushCount = 0;
 
     for (const userDoc of usersSnap.docs) {
       const uData = userDoc.data();
       const lineUserId = uData.lineUserId;
       const username = uData.username || 'User';
+      if (!lineUserId) continue;
 
-      if (!lineUserId) {
-        console.log(`[LINE Cron] User ${username} has no lineUserId, skipping.`);
-        continue;
-      }
+      const tasksSnap = await dbAdmin.collection('tasks').where('userId', '==', userDoc.id).get();
+      const logsSnap = await dbAdmin.collection('logs').where('userId', '==', userDoc.id).where('date', '==', todayStr).get();
 
-      console.log(`[LINE Cron] Processing notifications for ${username} (${lineUserId})`);
+      const logMap = new Map();
+      logsSnap.forEach(l => logMap.set(l.data().taskId, l.data()));
 
-      // 3. Fetch all tasks/events for this user
-      const tasksSnap = await dbAdmin.collection('tasks')
-        .where('userId', '==', userDoc.id)
-        .get();
-
-      const activeToday: string[] = [];
+      const morningEvents: string[] = [];
+      const morningTasks: string[] = [];
+      const eveningDone: string[] = [];
+      const eveningPending: string[] = [];
 
       for (const tDoc of tasksSnap.docs) {
         const task = tDoc.data();
-
         let isToday = false;
-        if (task.repeatType === 'daily') {
-          isToday = true;
-        } else if (task.repeatType === 'weekly' && Array.isArray(task.repeatDays)) {
-          isToday = task.repeatDays.includes(currentDay);
-        } else if (task.repeatType === 'once' && task.targetDate === todayStr) {
-          isToday = true;
-        }
+        if (task.repeatType === 'daily') isToday = true;
+        else if (task.repeatType === 'weekly' && task.repeatDays?.includes(currentDay)) isToday = true;
+        else if (task.repeatType === 'once' && task.targetDate === todayStr) isToday = true;
 
         if (isToday) {
           const typeEmoji = task.itemType === 'event' ? '🗓️' : '✅';
-          const priorityLabel = task.priority ? `[${task.priority.toUpperCase()}]` : '';
-          activeToday.push(`${typeEmoji} ${task.name} ${priorityLabel}`);
+          const label = `${typeEmoji} ${task.name}`;
+          
+          if (task.itemType === 'event') morningEvents.push(label);
+          else morningTasks.push(label);
+
+          if (logMap.has(task.id) && logMap.get(task.id).status === 'done') {
+            eveningDone.push(label);
+          } else {
+            eveningPending.push(label);
+          }
         }
       }
 
-      // 4. SendPush Notification if there are items today
-      if (activeToday.length > 0) {
-        const messageText = `☀️ Good morning, ${username}!\nHere is your schedule for today (${format(today, 'dd MMM')}):\n\n` + 
-                            activeToday.map((item, index) => `${index + 1}. ${item}`).join('\n') +
-                            `\n\n Have a productive day! 🚀`;
+      const totalActive = morningEvents.length + morningTasks.length;
+      if (totalActive === 0) continue;
 
-        const res = await pushMessage(lineUserId, messageText);
-        
-        if (!res.ok) {
-          const resBody = await res.text();
-          console.error(`[LINE Cron] Failed to send push to ${username}:`, res.status, resBody);
-        } else {
-          console.log(`[LINE Cron] Successfully sent push to ${username}`);
-          pushCount++;
-        }
+      let messageText = '';
+      if (type === 'morning') {
+        messageText = `☀️ Good Morning, ${username}!\n` +
+                      `Today is ${fullDate}\n\n` +
+                      (morningEvents.length > 0 ? `Event for Today:\n${morningEvents.map((t, i) => `${i+1}. ${t}`).join('\n')}\n\n` : '') +
+                      (morningTasks.length > 0 ? `Task for Today:\n${morningTasks.map((t, i) => `${i+1}. ${t}`).join('\n')}\n\n` : '') +
+                      `📍 Bangkok: 🌡️${temp}°C | 🌬️AQI ${aqi} (${aqiLabel})\n\n` +
+                      `Have a productive day! 🚀`;
       } else {
-        console.log(`[LINE Cron] No active items for ${username} today.`);
+        const percent = Math.round((eveningDone.length / totalActive) * 100);
+        messageText = `🌙 Daily Report for ${username}!\n` +
+                      `Today is ${fullDate}\n` +
+                      `-------------------\n` +
+                      `📊 Progress: ${eveningDone.length}/${totalActive} (${percent}%)\n\n` +
+                      (eveningDone.length > 0 ? `Done Today:\n${eveningDone.map(t => ` • ${t}`).join('\n')}\n\n` : '') +
+                      (eveningPending.length > 0 ? `Pending:\n${eveningPending.map(t => ` • ${t}`).join('\n')}\n\n` : '') +
+                      `📍 Bangkok now: 🌡️${temp}°C | 🌬️AQI ${aqi}\n\n` +
+                      (percent === 100 ? `👑 PERFECT! You're unstoppable! 🔥` : `💪 Great effort! Rest up for tomorrow.`);
       }
+
+      await pushMessage(lineUserId, messageText);
+      pushCount++;
     }
 
-    return NextResponse.json({ success: true, usersPushed: pushCount });
-  } catch (err: unknown) {
-    const errMsg = err instanceof Error ? err.message : 'Unknown Cron Error';
-    console.error('[LINE Cron] Failed:', err);
-    return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
+    return NextResponse.json({ success: true, mode: type, usersPushed: pushCount });
+  } catch (err: any) {
+    console.error('[LINE Cron] Error:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
