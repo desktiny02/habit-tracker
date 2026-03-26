@@ -20,10 +20,19 @@ async function pushMessage(to: string, text: string) {
 }
 
 export async function GET(req: Request) {
-  // 1. Verify Vercel Cron Authorization header to prevent public spam triggering
+  const { searchParams } = new URL(req.url);
+  const manualKey = searchParams.get('key');
+  
+  // 1. Verify Vercel Cron Authorization header OR Manual Key
   const authHeader = req.headers.get('Authorization');
-  if (process.env.NODE_ENV === 'production' && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response('Unauthorized', { status: 401 });
+  const cronSecret = process.env.CRON_SECRET;
+  
+  const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
+  const isManualTrigger = (manualKey === 'HabitAppCronTest'); // Secret fallback for testing
+  
+  if (process.env.NODE_ENV === 'production' && !isVercelCron && !isManualTrigger) {
+    console.error('[LINE Cron] Attempted access denied (Unauthorized). Headers present:', !!authHeader, 'ManualKey present:', !!manualKey);
+    return new Response('Unauthorized - Access denied.', { status: 401 });
   }
 
   try {
