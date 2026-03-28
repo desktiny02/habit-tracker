@@ -371,8 +371,7 @@ export const useCoupon = async (redemptionId: string) => {
 // ── Daily Bonus ──────────────────────────────────────────────────
 export const claimDailyLoginBonus = async (userId: string, todayStr: string) => {
   const userRef = doc(db, 'users', userId);
-  const bonuses = [1, 5, 10];
-  const bonus = bonuses[Math.floor(Math.random() * bonuses.length)];
+  const bonus = 1;
 
   let result = 0;
   await runTransaction(db, async (tx) => {

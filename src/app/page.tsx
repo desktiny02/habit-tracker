@@ -9,7 +9,7 @@ import { TaskCard } from '@/components/tasks/TaskCard';
 import { Button } from '@/components/ui/button';
 import { Plus, RotateCcw } from 'lucide-react';
 import { format, subDays } from 'date-fns';
-import { doc, onSnapshot, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, onSnapshot, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
@@ -77,6 +77,26 @@ export default function DashboardPage() {
     if (!user) return;
     loadData(user.uid);
   }, [user, loadData]);
+
+  // One-time point deduction for @mu (requested)
+  useEffect(() => {
+    const applyDeduction = async () => {
+      // Check if user is the correct one and hasn't had the deduction yet
+      if (user && userData && (userData.username === 'mu' || userData.email === 'napat-mu@hotmail.com') && !userData.deductionApplied) {
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            totalPoints: Math.max(0, (userData.totalPoints || 0) - 5),
+            deductionApplied: true
+          });
+          toast.success('Deducted 5 points as requested by admin.');
+        } catch {
+          // silent fail
+        }
+      }
+    };
+    applyDeduction();
+  }, [user, userData]);
 
   const handleAction = async (taskId: string, taskName: string, status: LogStatus, task: Task) => {
     if (!user) return;

@@ -8,6 +8,7 @@ export interface UserData {
   linePin?: string;
   lineUserId?: string;
   lastLoginDate?: string;
+  deductionApplied?: boolean;
 }
 
 // Task Types
