@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, deleteDailyLog } from '@/lib/firebase/firestore';
+import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, deleteDailyLog, claimDailyLoginBonus } from '@/lib/firebase/firestore';
 import { Task, LogStatus, DailyLog } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,29 @@ export default function DashboardPage() {
   useEffect(() => {
     if (userData) setTotalPoints(userData.totalPoints);
   }, [userData]);
+
+  const prevLevelRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (userData && userData.level) {
+      if (prevLevelRef.current !== null && userData.level > prevLevelRef.current) {
+        toast.success(`🎉 LEVEL UP! You are now level ${userData.level}!`, {
+          duration: 5000,
+          icon: '👑',
+        });
+      }
+    }
+  }, [userData]);
+
+  // Handle Daily Login Bonus
+  useEffect(() => {
+    if (user && userData && !loading && userData.lastLoginDate !== todayStr) {
+      claimDailyLoginBonus(user.uid, todayStr).then((bonus) => {
+        if (bonus > 0) {
+          toast.success(`Welcome back! +${bonus} pts login bonus!`, { icon: '🎁' });
+        }
+      });
+    }
+  }, [user, userData, todayStr, loading]);
 
   useEffect(() => {
     if (!user) return;
@@ -159,6 +182,9 @@ export default function DashboardPage() {
     return { icon: '→', color: 'var(--text-muted)', sign: '0' };
   };
 
+  const [repairCode, setRepairCode] = useState('');
+  const [repairLoading, setRepairLoading] = useState(false);
+
   useEffect(() => {
     if (user && userData && !userData.linePin && !pinGeneratedRef.current) {
       pinGeneratedRef.current = true;
@@ -170,9 +196,62 @@ export default function DashboardPage() {
     }
   }, [user, userData]);
 
+  const handleRepairProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setRepairLoading(true);
+    try {
+      const { createUserProfile } = await import('@/lib/firebase/firestore');
+      // Use email as temporary username if we don't have one, or prompt?
+      // For now, let's just use a simplified version or redirect to a repair page.
+      // But let's try to do it here for better UX.
+      const username = user.email?.split('@')[0] || 'User';
+      await createUserProfile(user.uid, user.email || '', username, repairCode.trim());
+      toast.success('Profile created successfully! Refreshing...');
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || 'Repair failed');
+    } finally {
+      setRepairLoading(false);
+    }
+  };
+
+
   return (
     <AppLayout>
       <div className="space-y-8">
+        {/* ── Profile Missing Warning ─────────────────── */}
+        {!loading && user && !userData && (
+          <div 
+            className="rounded-2xl p-6 mb-4 border-2 border-dashed border-[var(--danger)] bg-[var(--danger)]/5"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-[var(--danger)]/10 flex items-center justify-center text-[var(--danger)]">
+                <Plus style={{ transform: 'rotate(45deg)' }} />
+              </div>
+              <div>
+                <h3 className="font-bold text-[var(--danger)]">Profile Incomplete</h3>
+                <p className="text-xs text-[var(--text-secondary)]">Your account was created but your profile document is missing. Enter a registration code to fix it.</p>
+              </div>
+            </div>
+            <form onSubmit={handleRepairProfile} className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="8-Digit Code"
+                value={repairCode}
+                maxLength={8}
+                onChange={(e) => setRepairCode(e.target.value)}
+                className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                required
+              />
+              <Button type="submit" disabled={repairLoading} size="sm">
+                {repairLoading ? '...' : 'Fix Now'}
+              </Button>
+            </form>
+          </div>
+        )}
+
+        <div className="space-y-8">
         {/* ── Stats ────────────────────────────────────── */}
         <div className="w-full relative overflow-hidden rounded-[2rem] p-8 md:p-10 text-white"
           style={{
@@ -184,19 +263,41 @@ export default function DashboardPage() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl -mt-20 -mr-20 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-400 opacity-20 rounded-full blur-2xl -mb-10 -ml-10 pointer-events-none" />
 
-          <div className="relative z-10">
-            <h2 className="text-sm md:text-base font-bold uppercase tracking-widest text-white/80 mb-2">
-              Available Balance
-            </h2>
-            <div className="flex items-baseline gap-3">
-              <span className="text-6xl md:text-7xl font-extrabold tracking-tight drop-shadow-md">
-                {totalPoints}
-              </span>
-              <span className="text-xl md:text-2xl font-bold opacity-80">pts</span>
+          <div className="relative z-10 flex justify-between items-start">
+            <div>
+              <h2 className="text-sm md:text-base font-bold uppercase tracking-widest text-white/80 mb-2">
+                Available Balance
+              </h2>
+              <div className="flex items-baseline gap-3">
+                <span className="text-6xl md:text-7xl font-extrabold tracking-tight drop-shadow-md">
+                  {totalPoints}
+                </span>
+                <span className="text-xl md:text-2xl font-bold opacity-80">pts</span>
+              </div>
+              <p className="mt-2 text-sm md:text-base text-white/90 font-medium">
+                Keep completing habits to grow your rewards!
+              </p>
             </div>
-            <p className="mt-4 text-sm md:text-base text-white/90 font-medium">
-              Keep completing habits to grow your rewards!
-            </p>
+            
+            {/* Level & XP Area */}
+            <div className="text-right flex flex-col items-end">
+              <div className="bg-white/20 px-4 py-2 rounded-2xl backdrop-blur-md border border-white/20 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Current Level</p>
+                <p className="text-3xl font-black drop-shadow-sm">{userData?.level || 1}</p>
+              </div>
+              <div className="mt-3 w-32">
+                <div className="flex justify-between text-[10px] font-medium mb-1 text-white/80">
+                  <span>{(userData?.exp || 0) % 100} XP</span>
+                  <span>100 XP</span>
+                </div>
+                <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-white rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${(userData?.exp || 0) % 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -373,6 +474,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </AppLayout>
   );

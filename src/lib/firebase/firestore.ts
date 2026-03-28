@@ -157,8 +157,17 @@ export const logDailyTask = async (
 
   let pointsAwarded = 0;
   if (task.itemType !== 'event') {
-    if (status === 'done') pointsAwarded = task.points;
-    else if (status === 'missed') pointsAwarded = -calcPenalty(task);
+    if (status === 'done') {
+      pointsAwarded = task.points;
+      // Streak Multiplier: +5% per current streak day (max 2x total multiplier)
+      if (task.repeatType === 'daily') {
+        const streak = task.currentStreak || 0;
+        const multiplier = Math.min(2, 1 + (streak * 0.05));
+        pointsAwarded = Math.round(pointsAwarded * multiplier);
+      }
+    } else if (status === 'missed') {
+      pointsAwarded = -calcPenalty(task);
+    }
   }
 
   const newLog: DailyLog = { 
@@ -183,17 +192,26 @@ export const logDailyTask = async (
     const userSnap = await transaction.get(userRef);
     
     let currentPoints = 0;
+    let currentExp = 0;
     if (userSnap.exists()) {
-      currentPoints = (userSnap.data() as UserData).totalPoints || 0;
+      const uData = userSnap.data() as UserData;
+      currentPoints = uData.totalPoints || 0;
+      currentExp = uData.exp || 0;
     }
 
     let newTotalPoints = currentPoints + pointsAwarded;
     if (newTotalPoints < 0) newTotalPoints = 0;
+    
+    let newExp = currentExp;
+    if (status === 'done' && task.itemType !== 'event') {
+      newExp += 10;
+    }
+    const newLevel = Math.floor(newExp / 100) + 1;
 
     transaction.set(logRef, newLog);
     
     if (userSnap.exists()) {
-      transaction.update(userRef, { totalPoints: newTotalPoints });
+      transaction.update(userRef, { totalPoints: newTotalPoints, exp: newExp, level: newLevel });
     } else {
       // Auto-create missing profile silently
       const fallbackUsername = 'User'; // We could fetch from Auth but within transaction we keep it simple
@@ -202,9 +220,22 @@ export const logDailyTask = async (
         email: '', // will be updated if they re-register or we could skip email
         username: fallbackUsername,
         totalPoints: newTotalPoints,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        exp: newExp,
+        level: newLevel
       };
       transaction.set(userRef, newProfile, { merge: true });
+    }
+    
+    // Update Streak for Daily tasks
+    if (task.itemType !== 'event' && task.repeatType === 'daily') {
+      const taskRef = doc(db, 'tasks', taskId);
+      if (status === 'done') {
+        const newStreak = (task.currentStreak || 0) + 1;
+        transaction.update(taskRef, { currentStreak: newStreak });
+      } else if (status === 'missed') {
+        transaction.update(taskRef, { currentStreak: 0 });
+      }
     }
   });
 
@@ -345,4 +376,26 @@ export const redeemReward = async (userId: string, reward: Reward) => {
 
 export const useCoupon = async (redemptionId: string) => {
   await updateDoc(doc(db, 'redemptions', redemptionId), { status: 'used' });
+};
+
+// ── Daily Bonus ──────────────────────────────────────────────────
+export const claimDailyLoginBonus = async (userId: string, todayStr: string) => {
+  const userRef = doc(db, 'users', userId);
+  const bonuses = [1, 5, 10];
+  const bonus = bonuses[Math.floor(Math.random() * bonuses.length)];
+
+  let result = 0;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists()) return;
+    const data = snap.data() as UserData;
+    if (data.lastLoginDate === todayStr) return; // already claimed
+
+    tx.update(userRef, {
+      totalPoints: (data.totalPoints || 0) + bonus,
+      lastLoginDate: todayStr
+    });
+    result = bonus;
+  });
+  return result;
 };

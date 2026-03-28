@@ -55,6 +55,14 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
                 <Star style={{ width: 10, height: 10 }} /> Required
               </span>
             )}
+
+            {!isEvent && task.repeatType === 'daily' && (task.currentStreak || 0) > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}
+              >
+                🔥 {task.currentStreak} Day Streak
+              </span>
+            )}
           </div>
 
           <h3 className="font-semibold text-base leading-snug truncate mt-1" style={{ color: 'var(--text-primary)' }}>

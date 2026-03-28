@@ -7,6 +7,9 @@ export interface UserData {
   createdAt: number;
   linePin?: string;
   lineUserId?: string;
+  exp?: number;
+  level?: number;
+  lastLoginDate?: string;
 }
 
 // Task Types
@@ -27,6 +30,7 @@ export interface Task {
   repeatDays?: number[];
   targetDate?: string;
   createdAt: number;
+  currentStreak?: number;
 }
 
 // Log Types
