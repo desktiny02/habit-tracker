@@ -13,7 +13,7 @@ interface TaskCardProps {
 export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: TaskCardProps) {
   const [showDelete, setShowDelete] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  
+
   const isEvent = task.itemType === 'event';
   const pri = isEvent ? null : PRIORITY_CONFIG[task.priority || 'medium'];
 
@@ -36,10 +36,9 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
                 className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-secondary)' }}
               >
-                <Calendar style={{ width: 10, height: 10 }} /> Event
+                <Calendar style={{ width: 10, height: 10 }} aria-hidden="true" /> Event
               </span>
             ) : (
-              // Priority badge
               <span
                 className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: pri?.bg, color: pri?.color }}
@@ -49,15 +48,17 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
             )}
 
             {!isEvent && task.required && (
-              <span className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+              <span
+                className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}
               >
-                <Star style={{ width: 10, height: 10 }} /> Required
+                <Star style={{ width: 10, height: 10 }} aria-hidden="true" /> Required
               </span>
             )}
 
             {!isEvent && task.repeatType === 'daily' && (task.currentStreak || 0) > 0 && (
-              <span className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+              <span
+                className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}
               >
                 🔥 {task.currentStreak} Day Streak
@@ -72,7 +73,7 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
           <p className="text-sm mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
             {!isEvent && (
               <>
-                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: pri?.color }} />
+                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: pri?.color }} aria-hidden="true" />
                 {task.points} pts
               </>
             )}
@@ -93,10 +94,14 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Hide task details' : 'Show task details'}
               className="flex items-center gap-1 text-xs mt-1 cursor-pointer transition-opacity hover:opacity-70"
               style={{ color: 'var(--text-muted)' }}
             >
-              {expanded ? <ChevronUp style={{ width: 12, height: 12 }} /> : <ChevronDown style={{ width: 12, height: 12 }} />}
+              {expanded
+                ? <ChevronUp style={{ width: 12, height: 12 }} aria-hidden="true" />
+                : <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />}
               {expanded ? 'Hide details' : 'Show details'}
             </button>
           )}
@@ -108,19 +113,19 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
             <>
               <button
                 onClick={() => setShowDelete(false)}
+                aria-label="Cancel delete"
                 className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
                 style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-muted)' }}
-                title="Cancel"
               >
-                <X style={{ width: 16, height: 16 }} />
+                <X style={{ width: 16, height: 16 }} aria-hidden="true" />
               </button>
               <button
                 onClick={() => onDelete(task.id)}
+                aria-label="Confirm delete task"
                 className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 shadow-md"
                 style={{ backgroundColor: '#ef4444', color: '#fff' }}
-                title="Confirm delete"
               >
-                <Trash2 style={{ width: 16, height: 16 }} />
+                <Trash2 style={{ width: 16, height: 16 }} aria-hidden="true" />
               </button>
             </>
           ) : (
@@ -128,21 +133,21 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
               {/* Edit button */}
               <a
                 href={`/${isEvent ? 'events' : 'tasks'}/${task.id}/edit`}
-                title="Edit item"
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
+                aria-label={`Edit ${task.name}`}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
                 style={{ color: 'var(--text-muted)' }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
               </a>
 
               <button
                 onClick={() => setShowDelete(true)}
                 disabled={isLoading}
-                title="Delete item"
+                aria-label={`Delete ${task.name}`}
                 className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
                 style={{ color: 'var(--text-muted)' }}
               >
-                <Trash2 style={{ width: 14, height: 14 }} />
+                <Trash2 style={{ width: 14, height: 14 }} aria-hidden="true" />
               </button>
 
               {!hideActions && (
@@ -152,11 +157,11 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
                     <button
                       onClick={() => onAction(task.id, task.name, 'skipped', task)}
                       disabled={isLoading}
-                      title="Skip"
+                      aria-label={`Skip ${task.name}`}
                       className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-30 relative"
                       style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-muted)' }}
                     >
-                      <SkipForward style={{ width: 16, height: 16 }} />
+                      <SkipForward style={{ width: 16, height: 16 }} aria-hidden="true" />
                     </button>
                   )}
 
@@ -164,22 +169,22 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
                   <button
                     onClick={() => onAction(task.id, task.name, 'missed', task)}
                     disabled={isLoading}
-                    title={isEvent ? "Mark as not done" : "Mark as missed"}
+                    aria-label={isEvent ? `Mark ${task.name} as not done` : `Mark ${task.name} as missed`}
                     className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
                     style={{ backgroundColor: 'rgba(248,113,113,0.12)', color: 'var(--danger)' }}
                   >
-                    <X style={{ width: 16, height: 16 }} />
+                    <X style={{ width: 16, height: 16 }} aria-hidden="true" />
                   </button>
 
                   {/* Done / Tick */}
                   <button
                     onClick={() => onAction(task.id, task.name, 'done', task)}
                     disabled={isLoading}
-                    title="Mark as done"
+                    aria-label={`Mark ${task.name} as done`}
                     className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 disabled:opacity-40 shadow-md"
                     style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
                   >
-                    <Check style={{ width: 18, height: 18 }} />
+                    <Check style={{ width: 18, height: 18 }} aria-hidden="true" />
                   </button>
                 </>
               )}

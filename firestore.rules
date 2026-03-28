@@ -1,76 +1,80 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is signed in
+
+    // ── Helper functions ─────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Helper function to check if the user is accessing their own data
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Users Collection
+    // ── Users ────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'linePin', 'lineUserId', 'exp', 'level', 'lastLoginDate'])
-        && request.resource.data.totalPoints >= 0;      
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['totalPoints', 'linePin', 'lineUserId', 'lastLoginDate'])
+        && request.resource.data.totalPoints >= 0;
     }
 
-    // Usernames lookup Collection
-    // - Any authenticated user can read (required for real-time availability check)
-    // - Write is only allowed via server-side transaction from the owner's UID
+    // ── Usernames lookup ─────────────────────────────────────────────
     match /usernames/{username} {
       allow get: if true;
       allow list: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAuthenticated()
+        && resource.data.uid == request.auth.uid;
     }
 
-    
-    // Tasks Collection
+    // ── Registration Codes ───────────────────────────────────────────
+    match /registration_codes/{code} {
+      allow get: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && (!resource.data.used || resource.data.used == false)
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == request.auth.uid;
+    }
+
+    // ── Tasks / Events ───────────────────────────────────────────────
     match /tasks/{taskId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId) 
-        && request.resource.data.points >= 0 
-        && request.resource.data.points <= 1000;
+      allow create: if isOwner(request.resource.data.userId)
+        && request.resource.data.points >= 0
+        && request.resource.data.points <= 1000
+        && request.resource.data.name.size() <= 100;
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
-    
-    // Logs Collection
+
+    // ── Daily Logs ───────────────────────────────────────────────────
     match /logs/{logId} {
       allow read: if resource == null || isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId)
-         && request.resource.data.pointsAwarded >= -1000 
-         && request.resource.data.pointsAwarded <= 1000;
+        && request.resource.data.pointsAwarded >= -1000
+        && request.resource.data.pointsAwarded <= 1000;
       allow delete: if isOwner(resource.data.userId);
     }
-    
-    // Rewards Collection
+
+    // ── Rewards ──────────────────────────────────────────────────────
     match /rewards/{rewardId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId) && request.resource.data.cost > 0;
+      allow create: if isOwner(request.resource.data.userId)
+        && request.resource.data.cost > 0
+        && request.resource.data.name.size() <= 200;
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
-    
-    // Redemptions Collection
+
+    // ── Redemptions ──────────────────────────────────────────────────
     match /redemptions/{redemptionId} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
-    // Registration Codes Collection
-    match /registration_codes/{code} {
-      allow get: if isAuthenticated();
-      allow update: if isAuthenticated() 
-        && (!resource.data.used || resource.data.used == false)
-        && request.resource.data.used == true
-        && request.resource.data.usedBy == request.auth.uid;
     }
   }
 }

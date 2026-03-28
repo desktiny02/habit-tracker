@@ -7,8 +7,6 @@ export interface UserData {
   createdAt: number;
   linePin?: string;
   lineUserId?: string;
-  exp?: number;
-  level?: number;
   lastLoginDate?: string;
 }
 

@@ -192,37 +192,27 @@ export const logDailyTask = async (
     const userSnap = await transaction.get(userRef);
     
     let currentPoints = 0;
-    let currentExp = 0;
     if (userSnap.exists()) {
       const uData = userSnap.data() as UserData;
       currentPoints = uData.totalPoints || 0;
-      currentExp = uData.exp || 0;
     }
 
     let newTotalPoints = currentPoints + pointsAwarded;
     if (newTotalPoints < 0) newTotalPoints = 0;
     
-    let newExp = currentExp;
-    if (status === 'done' && task.itemType !== 'event') {
-      newExp += 10;
-    }
-    const newLevel = Math.floor(newExp / 100) + 1;
-
     transaction.set(logRef, newLog);
     
     if (userSnap.exists()) {
-      transaction.update(userRef, { totalPoints: newTotalPoints, exp: newExp, level: newLevel });
+      transaction.update(userRef, { totalPoints: newTotalPoints });
     } else {
       // Auto-create missing profile silently
-      const fallbackUsername = 'User'; // We could fetch from Auth but within transaction we keep it simple
+      const fallbackUsername = 'User'; 
       const newProfile: UserData = {
         id: userId,
-        email: '', // will be updated if they re-register or we could skip email
+        email: '', 
         username: fallbackUsername,
         totalPoints: newTotalPoints,
         createdAt: Date.now(),
-        exp: newExp,
-        level: newLevel
       };
       transaction.set(userRef, newProfile, { merge: true });
     }

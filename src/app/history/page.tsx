@@ -67,9 +67,8 @@ export default function HistoryPage() {
         
         setHasMore(combined.length > fetchLimit);
         setActivities(combined.slice(0, fetchLimit));
-      } catch (err) {
+      } catch {
         toast.error('Failed to load history');
-        console.error(err);
       } finally {
         setLoading(false);
       }

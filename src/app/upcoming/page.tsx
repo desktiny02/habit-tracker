@@ -5,10 +5,10 @@ import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState, useMemo } from 'react';
 import { Task, PRIORITY_CONFIG } from '@/types';
 import { db } from '@/lib/firebase/config';
-import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { format, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
-import { Button } from '@/components/ui/button';
+
 import { Trash2, X, Calendar, Repeat, CalendarClock } from 'lucide-react';
 import { sortTasksWithinDate } from '@/lib/sorting';
 import { deleteTask } from '@/lib/firebase/firestore';
@@ -40,8 +40,7 @@ export default function UpcomingPage() {
 
         upcomingItems.sort((a, b) => b.createdAt - a.createdAt);
         setItems(upcomingItems);
-      } catch (err) {
-        console.error(err);
+      } catch {
         toast.error('Failed to load upcoming items');
       } finally {
         setLoading(false);
@@ -120,8 +119,6 @@ export default function UpcomingPage() {
           <div className="space-y-3">
           <div className="space-y-8">
             {(() => {
-              const { addDays } = require('date-fns');
-
               const groups = Array.from({ length: 7 }).map((_, i) => {
                 const d = addDays(new Date(), i);
                 const dStr = format(d, 'yyyy-MM-dd');

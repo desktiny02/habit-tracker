@@ -61,17 +61,6 @@ export default function DashboardPage() {
     if (userData) setTotalPoints(userData.totalPoints);
   }, [userData]);
 
-  const prevLevelRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (userData && userData.level) {
-      if (prevLevelRef.current !== null && userData.level > prevLevelRef.current) {
-        toast.success(`🎉 LEVEL UP! You are now level ${userData.level}!`, {
-          duration: 5000,
-          icon: '👑',
-        });
-      }
-    }
-  }, [userData]);
 
   // Handle Daily Login Bonus
   useEffect(() => {
@@ -279,25 +268,6 @@ export default function DashboardPage() {
               </p>
             </div>
             
-            {/* Level & XP Area */}
-            <div className="text-right flex flex-col items-end">
-              <div className="bg-white/20 px-4 py-2 rounded-2xl backdrop-blur-md border border-white/20 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Current Level</p>
-                <p className="text-3xl font-black drop-shadow-sm">{userData?.level || 1}</p>
-              </div>
-              <div className="mt-3 w-32">
-                <div className="flex justify-between text-[10px] font-medium mb-1 text-white/80">
-                  <span>{(userData?.exp || 0) % 100} XP</span>
-                  <span>100 XP</span>
-                </div>
-                <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-white rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${(userData?.exp || 0) % 100}%` }}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

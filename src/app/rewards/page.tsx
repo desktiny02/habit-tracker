@@ -42,8 +42,7 @@ export default function RewardsPage() {
         setRewards(rewSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Reward)));
         const loadedRedemptions = redSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Redemption));
         setRedemptions(loadedRedemptions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      } catch (err: unknown) {
-        console.error(err);
+      } catch {
         toast.error('Failed to load rewards');
       } finally {
         setLoading(false);
@@ -69,10 +68,17 @@ export default function RewardsPage() {
     try {
       await redeemReward(user.uid, reward);
       toast.success(`Redeemed "${reward.name}"!`);
-      const qRedemptions = query(collection(db, 'redemptions'), where('userId', '==', user.uid));
-      const redSnaps = await getDocs(qRedemptions);
-      const loadedRedemptions = redSnaps.docs.map((d) => ({ ...d.data(), id: d.id } as Redemption));
-      setRedemptions(loadedRedemptions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      // Optimistically add new redemption to state instead of re-fetching
+      const newRedemption: Redemption = {
+        id: `optimistic-${Date.now()}`,
+        userId: user.uid,
+        rewardId: reward.id,
+        rewardName: reward.name,
+        date: new Date().toISOString(),
+        status: 'unused',
+        pointsSpent: reward.cost,
+      };
+      setRedemptions(prev => [newRedemption, ...prev]);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to redeem');
     } finally {

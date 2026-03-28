@@ -28,8 +28,9 @@ export function RewardCard({ reward, userPoints, onRedeem, onDelete, isLoading }
           <div
             className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
             style={{ backgroundColor: 'var(--accent-subtle)' }}
+            aria-hidden="true"
           >
-            <Gift style={{ color: 'var(--accent)', width: 20, height: 20 }} />
+            <Gift style={{ color: 'var(--accent)', width: 20, height: 20 }} aria-hidden="true" />
           </div>
           <div>
             <h3
@@ -43,37 +44,37 @@ export function RewardCard({ reward, userPoints, onRedeem, onDelete, isLoading }
             </p>
           </div>
         </div>
-        
+
         {onDelete && (
           <div className="flex items-center gap-2">
             {showDelete ? (
               <>
                 <button
                   onClick={() => setShowDelete(false)}
+                  aria-label="Cancel delete"
                   className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
                   style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-muted)' }}
-                  title="Cancel"
                 >
-                  <X style={{ width: 14, height: 14 }} />
+                  <X style={{ width: 14, height: 14 }} aria-hidden="true" />
                 </button>
                 <button
                   onClick={() => onDelete(reward)}
+                  aria-label={`Confirm delete ${reward.name}`}
                   className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 shadow-md"
                   style={{ backgroundColor: '#ef4444', color: '#fff' }}
-                  title="Confirm delete"
                 >
-                  <Trash2 style={{ width: 14, height: 14 }} />
+                  <Trash2 style={{ width: 14, height: 14 }} aria-hidden="true" />
                 </button>
               </>
             ) : (
               <button
                 onClick={() => setShowDelete(true)}
                 disabled={isLoading}
-                title="Delete Reward"
+                aria-label={`Delete ${reward.name}`}
                 className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40"
                 style={{ color: 'var(--text-muted)' }}
               >
-                <Trash2 style={{ width: 16, height: 16 }} />
+                <Trash2 style={{ width: 16, height: 16 }} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -84,6 +85,7 @@ export function RewardCard({ reward, userPoints, onRedeem, onDelete, isLoading }
         <div
           className="text-xs font-medium mt-1 text-center"
           style={{ color: 'var(--text-muted)' }}
+          aria-live="polite"
         >
           Need {reward.cost - userPoints} more points
         </div>
@@ -94,6 +96,7 @@ export function RewardCard({ reward, userPoints, onRedeem, onDelete, isLoading }
         className="w-full"
         disabled={!canAfford || isLoading}
         onClick={() => onRedeem(reward)}
+        aria-label={`Redeem ${reward.name} for ${reward.cost} points`}
       >
         {isLoading ? 'Redeeming…' : canAfford ? 'Redeem' : 'Not Enough Points'}
       </Button>
