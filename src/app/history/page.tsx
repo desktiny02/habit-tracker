@@ -33,13 +33,11 @@ export default function HistoryPage() {
         // since we combine 2 collections and sort locally, we fetch fetchLimit from both
         const qLogs = query(
           collection(db, 'logs'), 
-          where('userId', '==', user.uid),
-          limit(fetchLimit + 1)
+          where('userId', '==', user.uid)
         );
         const qRedemptions = query(
           collection(db, 'redemptions'), 
-          where('userId', '==', user.uid),
-          limit(fetchLimit + 1)
+          where('userId', '==', user.uid)
         );
         const qTasks = query(collection(db, 'tasks'), where('userId', '==', user.uid));
         

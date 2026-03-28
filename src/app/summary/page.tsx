@@ -40,12 +40,11 @@ export default function SummaryPage() {
       try {
         const q = query(
           collection(db, 'logs'),
-          where('userId', '==', user.uid),
-          where('date', '>=', weekStart),
-          where('date', '<=', weekEnd)
+          where('userId', '==', user.uid)
         );
         const snaps = await getDocs(q);
-        const logs = snaps.docs.map(d => d.data() as DailyLog);
+        const allLogs = snaps.docs.map(d => d.data() as DailyLog);
+        const logs = allLogs.filter(l => l.date >= weekStart && l.date <= weekEnd);
 
         let totalDone = 0, totalMissed = 0;
         let pointsEarned = 0, pointsLost = 0;

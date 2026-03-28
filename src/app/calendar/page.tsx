@@ -44,13 +44,8 @@ export default function CalendarPage() {
 
     const loadData = async () => {
       try {
-        // Filter logs server-side to avoid full collection scans
-        const qLogs = query(
-          collection(db, 'logs'),
-          where('userId', '==', user.uid),
-          where('date', '>=', startStr),
-          where('date', '<=', endStr)
-        );
+        // Filter logs only by userId to avoid requiring a composite index
+        const qLogs = query(collection(db, 'logs'), where('userId', '==', user.uid));
         const qTasks = query(collection(db, 'tasks'), where('userId', '==', user.uid));
 
         const [snapsLogs, snapsTasks] = await Promise.all([getDocs(qLogs), getDocs(qTasks)]);
@@ -62,8 +57,9 @@ export default function CalendarPage() {
           return t;
         });
         
-        // Logs are already filtered server-side
-        setLogs(allLogs);
+        // Filter logs client-side to avoid requiring composite indexes
+        const filteredLogs = allLogs.filter(l => l.date >= startStr && l.date <= endStr);
+        setLogs(filteredLogs);
         setTasks(allTasks);
       } catch {
         toast.error('Failed to load calendar data');
