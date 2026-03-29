@@ -13,6 +13,11 @@ export const sortTasksWithinDate = (a: Task | { task: Task }, b: Task | { task: 
   const taskA = 'task' in a ? (a as { task: Task }).task : (a as Task);
   const taskB = 'task' in b ? (b as { task: Task }).task : (b as Task);
 
+  // Time-based sorting (Chronological first)
+  const timeA = taskA.time || '99:99'; // items without time go to the relative bottom
+  const timeB = taskB.time || '99:99';
+  if (timeA !== timeB) return timeA.localeCompare(timeB);
+
   const priorityA = getTaskPriorityValue(taskA.priority);
   const priorityB = getTaskPriorityValue(taskB.priority);
 
