@@ -173,17 +173,18 @@ export const deleteTask = async (taskId: string, userId?: string) => {
   
   // Also delete all logs and notifications associated with this task
   if (userId) {
-    const qLogs = query(collection(db, 'logs'), where('userId', '==', userId), where('taskId', '==', taskId));
+    const qLogs = query(collection(db, 'logs'), where('userId', '==', userId));
     const qNotifs = query(collection(db, 'scheduled_notifications'), where('userId', '==', userId));
     const [logsSnap, notifsSnap] = await Promise.all([getDocs(qLogs), getDocs(qNotifs)]);
     
-    // Filter notifications for this specific task
+    // Filter results for this specific task
+    const taskLogs = logsSnap.docs.filter(d => d.data().taskId === taskId);
     const taskNotifs = notifsSnap.docs.filter(d => d.data().taskId === taskId);
     
     let pointsOffset = 0;
     const batch = writeBatch(db);
     
-    for (const d of logsSnap.docs) {
+    for (const d of taskLogs) {
       const data = d.data() as DailyLog;
       pointsOffset -= data.pointsAwarded || 0; 
       batch.delete(d.ref);
