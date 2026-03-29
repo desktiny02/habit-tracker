@@ -127,8 +127,9 @@ export default function DashboardPage() {
       await deleteTask(taskId, user.uid);
       setTasks(prev => prev.filter(t => t.id !== taskId));
       toast.success('Removed successfully');
-    } catch {
-      toast.error('Failed to remove');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error(`Remove failed: ${err.message || 'Unknown error'}`);
     }
   };
 

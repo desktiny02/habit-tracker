@@ -1,20 +1,16 @@
 const admin = require('firebase-admin');
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
-  });
-}
-
-const db = admin.firestore();
-
 async function run() {
-  const snap = await db.collection('tasks').get();
-  for (const doc of snap.docs) {
-    console.log(`Task ID: ${doc.id}`);
-    console.log(doc.data());
-    console.log('---');
-  }
+  const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(sa)
+  });
+  const db = admin.firestore();
+  
+  const snap = await db.collection('tasks').limit(20).get();
+  const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  console.log('--- TASKS ---');
+  console.log(JSON.stringify(tasks, null, 2));
 }
 
-run();
+run().catch(console.error);
