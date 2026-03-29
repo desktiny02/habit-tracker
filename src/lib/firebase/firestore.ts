@@ -27,7 +27,13 @@ export const syncScheduledNotifications = async (task: Task) => {
 
   // Determine date to schedule for (simplified: current or relative today/tomorrow based on targetDate/recurrence)
   // For 'once' tasks, use targetDate. For repeating, use today. 
-  const taskDate = task.repeatType === 'once' ? task.targetDate : new Date().toISOString().split('T')[0];
+  const localDate = new Date();
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+  
+  const taskDate = task.repeatType === 'once' ? task.targetDate : todayStr;
   if (!taskDate) return;
 
   const [hours, minutes] = task.time.split(':').map(Number);

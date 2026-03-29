@@ -10,6 +10,7 @@ export interface UserData {
   deductionApplied?: boolean;
   timezone?: string;
   language?: string;
+  telegramChatId?: string;
 }
 
 // Task Types
