@@ -22,7 +22,7 @@ service cloud.firestore {
     }
 
     match /scheduled_notifications/{id} {
-      allow read, delete: if isOwner(resource.data.userId);
+      allow read, delete: if isAuthenticated();
       allow create, update: if isOwner(request.resource.data.userId);
     }
 
@@ -53,7 +53,7 @@ service cloud.firestore {
         && request.resource.data.points <= 1000
         && request.resource.data.name.size() <= 100;
       allow update: if isOwner(resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow delete: if isAuthenticated();
     }
 
     // ── Daily Logs ───────────────────────────────────────────────────
@@ -62,7 +62,7 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.userId)
         && request.resource.data.pointsAwarded >= -1000
         && request.resource.data.pointsAwarded <= 1000;
-      allow delete: if isOwner(resource.data.userId);
+      allow delete: if isAuthenticated();
     }
 
     // ── Rewards ──────────────────────────────────────────────────────

@@ -71,18 +71,26 @@ export async function GET(req: Request) {
     const now = Date.now();
     const snapshot = await dbAdmin.collection('scheduled_notifications')
       .where('status', '==', 'pending')
-      .where('notifyAt', '<=', now)
-      .limit(50)
       .get();
 
     if (snapshot.empty) {
       return NextResponse.json({ success: true, count: 0 });
     }
 
+    // Filter by time in JS to avoid composite index requirement
+    const pendingNotifs = snapshot.docs
+      .map(d => ({ ref: d.ref, id: d.id, data: d.data() }))
+      .filter(n => n.data.notifyAt <= now)
+      .slice(0, 50);
+
+    if (pendingNotifs.length === 0) {
+      return NextResponse.json({ success: true, count: 0 });
+    }
+
     const results: any[] = [];
 
-    for (const doc of snapshot.docs) {
-      const notif = doc.data();
+    for (const notifInfo of pendingNotifs) {
+      const { data: notif, ref, id } = notifInfo;
       const userSnap = await dbAdmin.collection('users').doc(notif.userId).get();
       const userData = userSnap.data();
 
@@ -96,21 +104,21 @@ export async function GET(req: Request) {
           );
           
           const lineRes = await sendLineMessage(userData.lineUserId, message);
-          const lineStatus = lineRes?.status;
+          const lineStatus = lineRes ? lineRes.status : 'unknown';
           
-          await doc.ref.update({ status: 'sent', sentAt: admin.firestore.FieldValue.serverTimestamp() });
-          results.push({ id: doc.id, task: notif.taskName, status: 'sent', lineStatus });
+          await ref.update({ status: 'sent', sentAt: admin.firestore.FieldValue.serverTimestamp() });
+          results.push({ id, task: notif.taskName, status: 'sent', lineStatus });
         } catch (err: any) {
-          console.error(`[Dispatch Error for ${doc.id}]:`, err);
-          results.push({ id: doc.id, task: notif.taskName, status: 'error', error: err.message });
+          console.error(`[Dispatch Error for ${id}]:`, err);
+          results.push({ id, task: notif.taskName, status: 'error', error: err.message });
         }
       } else {
-        await doc.ref.update({ status: 'failed', error: 'No LINE ID connected' });
-        results.push({ id: doc.id, task: notif.taskName, status: 'failed', error: 'No LINE ID' });
+        await ref.update({ status: 'failed', error: 'No LINE ID connected' });
+        results.push({ id, task: notif.taskName, status: 'failed', error: 'No LINE ID' });
       }
     }
 
-    return NextResponse.json({ success: true, count: snapshot.size, results });
+    return NextResponse.json({ success: true, count: pendingNotifs.length, results });
   } catch (err: any) {
     console.error('[Global Dispatch Error]:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
