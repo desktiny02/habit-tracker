@@ -192,7 +192,7 @@ export async function POST(req: Request) {
           const prompt = `You are an AI task extractor. Extract from: "${text}". Today is ${format(new Date(), 'yyyy-MM-dd')}. 
 Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "points":number, "priority":"high"|"medium"|"low", "required":boolean, "repeatType":"daily"|"weekly"|"once", "repeatDays":[0-6], "targetDate":"YYYY-MM-DD"}`;
           
-          const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
