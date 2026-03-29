@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/firebase/admin';
 import { format } from 'date-fns';
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-
 async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: any) {
+  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.error('[Telegram Webhook] CRITICAL: TELEGRAM_BOT_TOKEN is missing in Vercel env!');
+    return;
+  }
   return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -18,6 +21,8 @@ async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: a
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+  if (!TELEGRAM_BOT_TOKEN) return;
   return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -31,6 +36,7 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    console.log('[Telegram Webhook] Received update:', JSON.stringify(body).slice(0, 200));
     
     // 1. Handle Callback Queries (Button Clicks)
     if (body.callback_query) {
@@ -55,6 +61,7 @@ export async function POST(req: Request) {
           await answerCallbackQuery(cb.id, "Task not found!");
           return NextResponse.json({ success: true });
         }
+
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const logId = `${userId}_${taskId}_${todayStr}`;
         const logRef = dbAdmin.collection('logs').doc(logId);
@@ -104,30 +111,26 @@ export async function POST(req: Request) {
       const text = msg.text.trim();
       const chatId = msg.chat.id;
 
-      // START
+      // Check for Start
       if (text.startsWith('/start')) {
-        await sendTelegramMessage(chatId, "👋 <b>Welcome to Habit Tracker!</b>\n\nI can help you track your habits directly from Telegram.\n\nCommands:\n/tasks - See today's tasks\n/status - Check your progress\n/link [PIN] - Link your account");
+        await sendTelegramMessage(chatId, "👋 <b>Welcome!</b> I can help you track your habits directly from Telegram.\n\nCommands:\n/tasks - See today's tasks\n/link [PIN] - Link your account");
         return NextResponse.json({ success: true });
       }
 
-      // LINK
+      // Check for Link
       if (text.startsWith('/link')) {
         const pin = text.split(' ')[1];
-        if (!pin) {
-          await sendTelegramMessage(chatId, "❌ Please provide a PIN from your dashboard. Example: <code>/link 123456</code>");
-          return NextResponse.json({ success: true });
-        }
         const snap = await dbAdmin.collection('users').where('linePin', '==', pin).get();
         if (!snap.empty) {
           await snap.docs[0].ref.update({ telegramChatId: String(chatId) });
-          await sendTelegramMessage(chatId, "✅ <b>Success!</b> Your Telegram is now linked to your Habit Tracker account.");
+          await sendTelegramMessage(chatId, "✅ <b>Success!</b> Your Telegram is now linked.");
         } else {
-          await sendTelegramMessage(chatId, "❌ <b>Invalid PIN.</b> Please check the top of your dashboard for the correct 6-digit code.");
+          await sendTelegramMessage(chatId, "❌ <b>Invalid PIN.</b> Check your dashboard card for the code!");
         }
         return NextResponse.json({ success: true });
       }
 
-      // TASKS
+      // Check for Tasks
       if (text.startsWith('/tasks')) {
         const userSnap = await dbAdmin.collection('users').where('telegramChatId', '==', String(chatId)).get();
         if (userSnap.empty) {
@@ -174,13 +177,18 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true });
       }
 
-      // AI EXTRACTOR (If no command)
+      // AI EXTRACTOR (Self-Diagnostic Mode)
       try {
         const userSnap = await dbAdmin.collection('users').where('telegramChatId', '==', String(chatId)).get();
         if (!userSnap.empty) {
           const userDoc = userSnap.docs[0];
           const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
           
+          if (!GEMINI_API_KEY) {
+            await sendTelegramMessage(chatId, "⚠️ <b>Error:</b> GEMINI_API_KEY is missing in the server! Natural entries are locked.");
+            return NextResponse.json({ success: true });
+          }
+
           const prompt = `You are an AI task extractor. Extract from: "${text}". Today is ${format(new Date(), 'yyyy-MM-dd')}. 
 Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "points":number, "priority":"high"|"medium"|"low", "required":boolean, "repeatType":"daily"|"weekly"|"once", "repeatDays":[0-6], "targetDate":"YYYY-MM-DD"}`;
           
@@ -191,12 +199,13 @@ Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "poi
           });
           const resJson = await aiRes.json();
           const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!textContent) throw new Error('AI returned empty response');
+          
+          if (!textContent) throw new Error('AI returned empty response. Check API key status.');
           
           const cleanJson = textContent.replace(/```json|```/g, '').trim();
           const config = JSON.parse(cleanJson);
 
-          if (!config || !config.name) throw new Error('AI failed to extract task name');
+          if (!config || !config.name) throw new Error('AI failed to extract task name.');
 
           const taskRef = dbAdmin.collection('tasks').doc();
           await taskRef.set({
@@ -206,10 +215,12 @@ Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "poi
             createdAt: Date.now()
           });
           await sendTelegramMessage(chatId, `✅ <b>Added:</b> "${config.name}" to your list!`);
+        } else {
+           await sendTelegramMessage(chatId, "⚠️ <b>Account not linked!</b> Please type <code>/link PIN</code> first.");
         }
       } catch (e: any) {
-        console.error('AI error:', e);
-        await sendTelegramMessage(chatId, `⚠️ AI Parsing failed: ${e.message}`);
+        console.error('[Telegram AI Parsing Error]:', e);
+        await sendTelegramMessage(chatId, `⚠️ <b>AI Error:</b> ${e.message}`);
       }
     }
 
