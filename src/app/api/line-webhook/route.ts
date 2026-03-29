@@ -88,7 +88,9 @@ export async function POST(req: Request) {
 Today is ${new Date().toISOString().split('T')[0]}.
 Return a JSON object: { "itemType": "task"|"event", "name": "...", "description": "...", "points": number, "priority": "high"|"medium"|"low", "required": boolean, "repeatType": "daily"|"weekly"|"once", "repeatDays": number[] (0-6 Sun-Sat, only if weekly), "targetDate": "YYYY-MM-DD" (only if once) }`;
 
-              const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+              const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+
+              const aiRes = await fetch(aiUrl, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({
@@ -99,7 +101,8 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
 
               const resJson = await aiRes.json();
               if (resJson.error) {
-                 throw new Error(`Gemini API Error: ${resJson.error.message}`);
+                 await replyMessage(replyToken, `⚠️ Gemini 3 Error: ${resJson.error.message}`);
+                 continue;
               }
 
               const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;

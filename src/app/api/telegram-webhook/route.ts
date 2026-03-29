@@ -192,15 +192,25 @@ export async function POST(req: Request) {
           const prompt = `You are an AI task extractor. Extract from: "${text}". Today is ${format(new Date(), 'yyyy-MM-dd')}. 
 Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "points":number, "priority":"high"|"medium"|"low", "required":boolean, "repeatType":"daily"|"weekly"|"once", "repeatDays":[0-6], "targetDate":"YYYY-MM-DD"}`;
           
-          const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          // Using v1beta for the brand-new Gemini 3 series
+          const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+          
+          const aiRes = await fetch(aiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
           });
+          
           const resJson = await aiRes.json();
+          
+          if (resJson.error) {
+              await sendTelegramMessage(chatId, `⚠️ <b>Gemini 3 Error:</b> ${resJson.error.message}\n<code>Code: ${resJson.error.code}</code>`);
+              return NextResponse.json({ success: true });
+          }
+
           const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
           
-          if (!textContent) throw new Error('AI returned empty response. Check API key status.');
+          if (!textContent) throw new Error('AI returned empty response. Check API key status/project limits.');
           
           const cleanJson = textContent.replace(/```json|```/g, '').trim();
           const config = JSON.parse(cleanJson);
@@ -220,7 +230,7 @@ Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "poi
         }
       } catch (e: any) {
         console.error('[Telegram AI Parsing Error]:', e);
-        await sendTelegramMessage(chatId, `⚠️ <b>AI Error:</b> ${e.message}`);
+        await sendTelegramMessage(chatId, `⚠️ <b>AI Parse Error:</b> ${e.message}`);
       }
     }
 
