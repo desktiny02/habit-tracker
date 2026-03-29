@@ -64,6 +64,7 @@ export const syncScheduledNotifications = async (task: Task) => {
   for (const n of notificationsToSend) {
     const nRef = doc(collection(db, 'scheduled_notifications'));
     await setDoc(nRef, { ...n, id: nRef.id });
+    console.log(`[Scheduled] ${n.type} for "${n.taskName}" at ${new Date(n.notifyAt).toLocaleString()}`);
   }
 };
 

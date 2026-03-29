@@ -79,7 +79,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, count: 0 });
     }
 
-    const tasks: Promise<any>[] = [];
+    const results: any[] = [];
 
     for (const doc of snapshot.docs) {
       const notif = doc.data();
@@ -87,7 +87,7 @@ export async function GET(req: Request) {
       const userData = userSnap.data();
 
       if (userData?.lineUserId) {
-        tasks.push((async () => {
+        try {
           const message = await generateGeminiMessage(
             notif.taskName,
             notif.scheduledTime,
@@ -95,19 +95,24 @@ export async function GET(req: Request) {
             notif.priority
           );
           
-          await sendLineMessage(userData.lineUserId, message);
+          const lineRes = await sendLineMessage(userData.lineUserId, message);
+          const lineStatus = lineRes?.status;
+          
           await doc.ref.update({ status: 'sent', sentAt: admin.firestore.FieldValue.serverTimestamp() });
-        })());
+          results.push({ id: doc.id, task: notif.taskName, status: 'sent', lineStatus });
+        } catch (err: any) {
+          console.error(`[Dispatch Error for ${doc.id}]:`, err);
+          results.push({ id: doc.id, task: notif.taskName, status: 'error', error: err.message });
+        }
       } else {
-        // Mark as failed or skipped if no LINE ID
-        tasks.push(doc.ref.update({ status: 'failed', error: 'No LINE ID connected' }));
+        await doc.ref.update({ status: 'failed', error: 'No LINE ID connected' });
+        results.push({ id: doc.id, task: notif.taskName, status: 'failed', error: 'No LINE ID' });
       }
     }
 
-    await Promise.all(tasks);
-    return NextResponse.json({ success: true, count: snapshot.size });
+    return NextResponse.json({ success: true, count: snapshot.size, results });
   } catch (err: any) {
-    console.error('[Dispatch Error]:', err);
+    console.error('[Global Dispatch Error]:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
