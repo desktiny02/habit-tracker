@@ -39,6 +39,8 @@ export interface ScheduledNotification {
   userId: string;
   taskId: string;
   taskName: string;
+  description?: string;
+  itemType: ItemType;
   type: 'standard' | 'priority'; // standard: 1h before, priority: 10m before
   notifyAt: number; // timestamp in ms
   status: 'pending' | 'sent' | 'failed';
