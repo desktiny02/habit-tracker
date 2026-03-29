@@ -103,14 +103,16 @@ export async function GET(req: Request) {
 
     const weather = await getBangkokContext();
     const usersSnap = await dbAdmin.collection('users').get();
-    let pushCount = 0;
-
-    for (const userDoc of usersSnap.docs) {
+    
+    const pushTasks = usersSnap.docs.map(async (userDoc) => {
       const uData = userDoc.data();
-      if (!uData.lineUserId) continue;
+      if (!uData.lineUserId) return;
 
-      const tasksSnap = await dbAdmin.collection('tasks').where('userId', '==', userDoc.id).get();
-      const logsSnap = await dbAdmin.collection('logs').where('userId', '==', userDoc.id).where('date', '==', todayStr).get();
+      const [tasksSnap, logsSnap] = await Promise.all([
+        dbAdmin.collection('tasks').where('userId', '==', userDoc.id).get(),
+        dbAdmin.collection('logs').where('userId', '==', userDoc.id).where('date', '==', todayStr).get()
+      ]);
+
       const logMap = new Map();
       logsSnap.forEach(l => logMap.set(l.data().taskId, l.data()));
 
@@ -130,7 +132,7 @@ export async function GET(req: Request) {
         }
       }
 
-      if (events.length + tasks.length === 0) continue;
+      if (events.length + tasks.length === 0) return;
 
       let msg = '';
       if (mode === 'morning') {
@@ -149,7 +151,7 @@ export async function GET(req: Request) {
         const tmr = addDays(now, 1);
         const w = weather?.tmr;
         const total = completed.length + pending.length;
-        const percent = Math.round((completed.length / total) * 100);
+        const percent = total > 0 ? Math.round((completed.length / total) * 100) : 0;
 
         msg = `🌙 Daily Report for ${uData.username || 'mu'}!\n` +
               `Tomorrow is ${format(tmr, 'eee, dd MMMM yyyy')}\n` +
@@ -165,8 +167,11 @@ export async function GET(req: Request) {
       }
 
       await pushMessage(uData.lineUserId, msg);
-      pushCount++;
-    }
+      return true;
+    });
+
+    const pushed = await Promise.all(pushTasks);
+    const pushCount = pushed.filter(Boolean).length;
 
     return NextResponse.json({ success: true, mode, usersPushed: pushCount });
   } catch (err: any) {

@@ -9,13 +9,19 @@ export const syncScheduledNotifications = async (task: Task) => {
   // Clear existing pending notifications for this task
   const q = query(
     collection(db, 'scheduled_notifications'),
-    where('taskId', '==', task.id),
-    where('status', '==', 'pending')
+    where('userId', '==', task.userId)
   );
   const snap = await getDocs(q);
-  const batch = writeBatch(db);
-  snap.forEach(d => batch.delete(d.ref));
-  await batch.commit();
+  const toDelete = snap.docs.filter(d => {
+    const data = d.data();
+    return data.taskId === task.id && data.status === 'pending';
+  });
+
+  if (toDelete.length > 0) {
+    const batch = writeBatch(db);
+    toDelete.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
 
   if (!task.time) return;
 
@@ -168,8 +174,11 @@ export const deleteTask = async (taskId: string, userId?: string) => {
   // Also delete all logs and notifications associated with this task
   if (userId) {
     const qLogs = query(collection(db, 'logs'), where('userId', '==', userId), where('taskId', '==', taskId));
-    const qNotifs = query(collection(db, 'scheduled_notifications'), where('taskId', '==', taskId));
+    const qNotifs = query(collection(db, 'scheduled_notifications'), where('userId', '==', userId));
     const [logsSnap, notifsSnap] = await Promise.all([getDocs(qLogs), getDocs(qNotifs)]);
+    
+    // Filter notifications for this specific task
+    const taskNotifs = notifsSnap.docs.filter(d => d.data().taskId === taskId);
     
     let pointsOffset = 0;
     const batch = writeBatch(db);
@@ -180,7 +189,7 @@ export const deleteTask = async (taskId: string, userId?: string) => {
       batch.delete(d.ref);
     }
 
-    for (const d of notifsSnap.docs) {
+    for (const d of taskNotifs) {
       batch.delete(d.ref);
     }
     
