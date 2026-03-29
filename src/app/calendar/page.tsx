@@ -12,6 +12,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { sortTasksWithinDate } from '@/lib/sorting';
 
 export default function CalendarPage() {
   const { user } = useAuth();
@@ -102,7 +103,7 @@ export default function CalendarPage() {
         items.push({ task, log });
       }
     }
-    return items;
+    return items.sort(sortTasksWithinDate);
   };
 
   return (
@@ -242,6 +243,9 @@ export default function CalendarPage() {
                                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: badgeColor }} />
                                        <div className="min-w-0">
                                          <span className="font-medium text-sm block truncate" style={{ color: 'var(--text-primary)' }}>{item.task.name}</span>
+                                         {item.task.time && (
+                                           <span className="text-[10px] font-bold text-[var(--accent)] opacity-80 block">⏰ {item.task.time}</span>
+                                         )}
                                        </div>
                                     </div>
                                     <div className="flex items-center gap-3 shrink-0">

@@ -38,7 +38,7 @@ export default function UpcomingPage() {
           return false;
         });
 
-        upcomingItems.sort((a, b) => b.createdAt - a.createdAt);
+        upcomingItems.sort(sortTasksWithinDate);
         setItems(upcomingItems);
       } catch {
         toast.error('Failed to load upcoming items');
@@ -194,6 +194,11 @@ export default function UpcomingPage() {
                               <div className="flex items-center gap-1.5 mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
                                 <Icon style={{ width: 12, height: 12 }} />
                                 {scheduleLabel(item)}
+                                {item.time && (
+                                  <span className="flex items-center gap-1 ml-2 text-[var(--accent)] font-bold">
+                                    · ⏰ {item.time}
+                                  </span>
+                                )}
                                 {!isEvent && (
                                   <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>
                                     · {item.points} pts
