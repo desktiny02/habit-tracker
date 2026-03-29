@@ -1,4 +1,3 @@
-// User Types
 export interface UserData {
   id: string;
   email: string;
@@ -9,6 +8,8 @@ export interface UserData {
   lineUserId?: string;
   lastLoginDate?: string;
   deductionApplied?: boolean;
+  timezone?: string;
+  language?: string;
 }
 
 // Task Types
@@ -28,8 +29,21 @@ export interface Task {
   repeatType: RepeatType;
   repeatDays?: number[];
   targetDate?: string;
+  time?: string; // HH:mm format
   createdAt: number;
   currentStreak?: number;
+}
+
+export interface ScheduledNotification {
+  id: string;
+  userId: string;
+  taskId: string;
+  taskName: string;
+  type: 'standard' | 'priority'; // standard: 1h before, priority: 10m before
+  notifyAt: number; // timestamp in ms
+  status: 'pending' | 'sent' | 'failed';
+  priority?: Priority;
+  scheduledTime: string; // HH:mm
 }
 
 // Log Types

@@ -64,6 +64,15 @@ export function TaskCard({ task, onAction, onDelete, isLoading, hideActions }: T
                 🔥 {task.currentStreak} Day Streak
               </span>
             )}
+
+            {task.time && (
+              <span
+                className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}
+              >
+                ⏰ {task.time}
+              </span>
+            )}
           </div>
 
           <h3 className="font-semibold text-base leading-snug truncate mt-1" style={{ color: 'var(--text-primary)' }}>

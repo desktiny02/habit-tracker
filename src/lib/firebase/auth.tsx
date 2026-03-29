@@ -29,9 +29,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubUser(); // clear previous snapshot listener
 
       if (firebaseUser) {
-        unsubUser = onSnapshot(doc(db, 'users', firebaseUser.uid), (snap) => {
+        unsubUser = onSnapshot(doc(db, 'users', firebaseUser.uid), snap => {
           if (snap.exists()) {
-            setUserData(snap.data() as UserData);
+            const data = snap.data() as UserData;
+            setUserData(data);
+
+            // Auto-detect timezone/language if missing or changed
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const lang = navigator.language;
+            if (data.timezone !== tz || data.language !== lang) {
+              import('firebase/firestore').then(({ updateDoc }) => {
+                updateDoc(doc(db, 'users', firebaseUser.uid), {
+                  timezone: tz,
+                  language: lang,
+                }).catch(() => {});
+              });
+            }
           } else {
             setUserData(null);
           }

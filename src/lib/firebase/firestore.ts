@@ -1,6 +1,71 @@
 import { db } from './config';
-import { collection, doc, setDoc, getDoc, getDocs, query, where, updateDoc, runTransaction, writeBatch } from 'firebase/firestore';
-import { Task, DailyLog, LogStatus, Reward, Redemption, UserData, PRIORITY_CONFIG } from '@/types';
+import { collection, doc, setDoc, getDoc, getDocs, query, where, updateDoc, runTransaction, writeBatch, deleteDoc } from 'firebase/firestore';
+import { Task, DailyLog, LogStatus, Reward, Redemption, UserData, PRIORITY_CONFIG, ScheduledNotification } from '@/types';
+
+// ── Notification Helpers ─────────────────────────────────────
+export const syncScheduledNotifications = async (task: Task) => {
+  if (!task.userId) return;
+
+  // Clear existing pending notifications for this task
+  const q = query(
+    collection(db, 'scheduled_notifications'),
+    where('taskId', '==', task.id),
+    where('status', '==', 'pending')
+  );
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+
+  if (!task.time) return;
+
+  // Determine date to schedule for (simplified: current or relative today/tomorrow based on targetDate/recurrence)
+  // For 'once' tasks, use targetDate. For repeating, use today. 
+  const taskDate = task.repeatType === 'once' ? task.targetDate : new Date().toISOString().split('T')[0];
+  if (!taskDate) return;
+
+  const [hours, minutes] = task.time.split(':').map(Number);
+  const scheduledDateTime = new Date(`${taskDate}T${task.time}:00`);
+  const now = Date.now();
+
+  const notificationsToSend: Omit<ScheduledNotification, 'id'>[] = [];
+
+  // Standard (1h before)
+  const notifyAtStandard = scheduledDateTime.getTime() - (60 * 60 * 1000);
+  if (notifyAtStandard > now) {
+    notificationsToSend.push({
+      userId: task.userId,
+      taskId: task.id,
+      taskName: task.name,
+      type: 'standard',
+      notifyAt: notifyAtStandard,
+      status: 'pending',
+      scheduledTime: task.time
+    });
+  }
+
+  // Priority (10m before)
+  if (task.required && task.priority === 'high') {
+    const notifyAtPriority = scheduledDateTime.getTime() - (10 * 60 * 1000);
+    if (notifyAtPriority > now) {
+      notificationsToSend.push({
+        userId: task.userId,
+        taskId: task.id,
+        taskName: task.name,
+        type: 'priority',
+        notifyAt: notifyAtPriority,
+        status: 'pending',
+        priority: task.priority,
+        scheduledTime: task.time
+      });
+    }
+  }
+
+  for (const n of notificationsToSend) {
+    const nRef = doc(collection(db, 'scheduled_notifications'));
+    await setDoc(nRef, { ...n, id: nRef.id });
+  }
+};
 
 // ── Reserved usernames ────────────────────────────────────────────
 const RESERVED_USERNAMES = new Set(['admin', 'support', 'system', 'moderator', 'root', 'api', 'help', 'info', 'contact', 'security']);
@@ -76,12 +141,18 @@ export const createTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {
     createdAt: Date.now()
   };
   await setDoc(taskRef, newTask);
+  await syncScheduledNotifications(newTask).catch(console.error);
   return newTask;
 };
 
 export const updateTask = async (taskId: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'userId'>>) => {
   const taskRef = doc(db, 'tasks', taskId);
   await updateDoc(taskRef, updates);
+  
+  const snap = await getDoc(taskRef);
+  if (snap.exists()) {
+    await syncScheduledNotifications(snap.data() as Task).catch(console.error);
+  }
 };
 
 export const getUserTasks = async (userId: string) => {
@@ -93,10 +164,11 @@ export const getUserTasks = async (userId: string) => {
 export const deleteTask = async (taskId: string, userId?: string) => {
   const { deleteDoc, writeBatch } = await import('firebase/firestore');
   
-  // Also delete all logs associated with this task
+  // Also delete all logs and notifications associated with this task
   if (userId) {
     const qLogs = query(collection(db, 'logs'), where('userId', '==', userId), where('taskId', '==', taskId));
-    const logsSnap = await getDocs(qLogs);
+    const qNotifs = query(collection(db, 'scheduled_notifications'), where('taskId', '==', taskId));
+    const [logsSnap, notifsSnap] = await Promise.all([getDocs(qLogs), getDocs(qNotifs)]);
     
     let pointsOffset = 0;
     const batch = writeBatch(db);
@@ -104,6 +176,10 @@ export const deleteTask = async (taskId: string, userId?: string) => {
     for (const d of logsSnap.docs) {
       const data = d.data() as DailyLog;
       pointsOffset -= data.pointsAwarded || 0; 
+      batch.delete(d.ref);
+    }
+
+    for (const d of notifsSnap.docs) {
       batch.delete(d.ref);
     }
     

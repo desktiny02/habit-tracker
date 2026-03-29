@@ -19,6 +19,7 @@ export default function NewEventPage() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [time, setTime] = useState<string>(''); // Optional time
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +38,7 @@ export default function NewEventPage() {
         required: false, // dummy
         repeatType: 'once',
         targetDate,
+        time: time || undefined,
       });
       toast.success('Event created!');
       router.push('/');
@@ -114,8 +116,24 @@ export default function NewEventPage() {
               required
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
-              min={format(new Date(), 'yyyy-MM-dd')} // no past dates if you want
+              min={format(new Date(), 'yyyy-MM-dd')}
             />
+          </div>
+
+          {/* Time Picker */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Scheduled Time <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+            </label>
+            <Input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              placeholder="Select time"
+            />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Set a time to enable LINE OA reminders.
+            </p>
           </div>
 
           <div className="pt-2">

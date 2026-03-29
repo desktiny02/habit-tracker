@@ -32,6 +32,7 @@ export default function EditTaskPage() {
   const [repeatType, setRepeatType] = useState<'today' | 'once' | 'weekly' | 'daily'>('daily');
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [time, setTime] = useState<string>(''); // Optional time
 
   useEffect(() => {
     if (!user || !id) return;
@@ -68,6 +69,7 @@ export default function EditTaskPage() {
         }
         
         setRepeatDays(data.repeatDays || []);
+        setTime(data.time || '');
       } catch (err) {
         toast.error('Error loading task');
       } finally {
@@ -110,6 +112,7 @@ export default function EditTaskPage() {
         priority,
         required,
         repeatType: finalRepeatType,
+        time: time || '',
         ...(finalRepeatType === 'weekly' ? { repeatDays } : { repeatDays: [] }),
         ...(finalRepeatType === 'once' ? { targetDate: finalTargetDate } : { targetDate: '' }),
       });
@@ -249,6 +252,22 @@ export default function EditTaskPage() {
                 }}
               />
             </button>
+          </div>
+
+          {/* Time Picker */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Scheduled Time <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+            </label>
+            <Input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              placeholder="Select time"
+            />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Set a time to enable LINE OA reminders.
+            </p>
           </div>
 
           {/* Frequency */}

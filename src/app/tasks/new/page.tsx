@@ -26,6 +26,7 @@ export default function NewTaskPage() {
   const [repeatType, setRepeatType] = useState<'today' | 'once' | 'weekly' | 'daily'>('today');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [time, setTime] = useState<string>(''); // Optional time
 
   const toggleDay = (dayIndex: number) => {
     setRepeatDays(prev =>
@@ -62,6 +63,7 @@ export default function NewTaskPage() {
         priority,
         required,
         repeatType: finalRepeatType,
+        time: time || undefined,
         ...(finalRepeatType === 'weekly' ? { repeatDays } : {}),
         ...(finalRepeatType === 'once' ? { targetDate: finalTargetDate } : {}),
       });
@@ -191,6 +193,22 @@ export default function NewTaskPage() {
                 }}
               />
             </button>
+          </div>
+
+          {/* Time Picker */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Scheduled Time <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+            </label>
+            <Input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              placeholder="Select time"
+            />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Set a time to enable LINE OA reminders.
+            </p>
           </div>
 
           {/* Frequency */}

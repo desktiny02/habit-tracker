@@ -25,6 +25,7 @@ export default function EditEventPage() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [targetDate, setTargetDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [time, setTime] = useState<string>(''); // Optional time
 
   useEffect(() => {
     if (!user || !id) return;
@@ -45,6 +46,7 @@ export default function EditEventPage() {
         setName(data.name || '');
         setDescription(data.description || '');
         setTargetDate(data.targetDate || format(new Date(), 'yyyy-MM-dd'));
+        setTime(data.time || '');
       } catch (err) {
         toast.error('Error loading event');
       } finally {
@@ -65,6 +67,7 @@ export default function EditEventPage() {
         name,
         description,
         targetDate,
+        time: time || '',
       });
       toast.success('Event updated!');
       router.back();
@@ -156,6 +159,22 @@ export default function EditEventPage() {
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
             />
+          </div>
+
+          {/* Time Picker */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Scheduled Time <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+            </label>
+            <Input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              placeholder="Select time"
+            />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Set a time to enable LINE OA reminders.
+            </p>
           </div>
 
           <div className="pt-2">
