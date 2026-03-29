@@ -169,8 +169,6 @@ export const getUserTasks = async (userId: string) => {
 };
 
 export const deleteTask = async (taskId: string, userId?: string) => {
-  const { deleteDoc, writeBatch } = await import('firebase/firestore');
-  
   // Also delete all logs and notifications associated with this task
   if (userId) {
     const qLogs = query(collection(db, 'logs'), where('userId', '==', userId));
@@ -182,32 +180,48 @@ export const deleteTask = async (taskId: string, userId?: string) => {
     const taskNotifs = notifsSnap.docs.filter(d => d.data().taskId === taskId);
     
     let pointsOffset = 0;
-    const batch = writeBatch(db);
     
+    // 1. Delete Logs (Non-critical for the task itself)
     for (const d of taskLogs) {
-      const data = d.data() as DailyLog;
-      pointsOffset -= data.pointsAwarded || 0; 
-      batch.delete(d.ref);
+      try {
+        const data = d.data() as DailyLog;
+        pointsOffset -= data.pointsAwarded || 0; 
+        await deleteDoc(d.ref);
+      } catch (e: any) {
+        console.warn(`[Delete Task] Failed to delete log ${d.id}:`, e.message);
+      }
     }
 
+    // 2. Delete Notifications (Non-critical)
     for (const d of taskNotifs) {
-      batch.delete(d.ref);
-    }
-    
-    // Delete the task itself
-    batch.delete(doc(db, 'tasks', taskId));
-    
-    // Apply points offset
-    if (pointsOffset !== 0) {
-      const userRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-         const currentPoints = (userSnap.data() as UserData).totalPoints || 0;
-         batch.update(userRef, { totalPoints: Math.max(0, currentPoints + pointsOffset) });
+      try {
+        await deleteDoc(d.ref);
+      } catch (e: any) {
+        console.warn(`[Delete Task] Failed to delete notification ${d.id}:`, e.message);
       }
     }
     
-    await batch.commit();
+    // 3. Delete the task itself (Critical)
+    try {
+      await deleteDoc(doc(db, 'tasks', taskId));
+    } catch (e: any) {
+      console.error(`[Delete Task] CRITICAL: Failed to delete task doc itself:`, e.message);
+      throw new Error(`Failed to delete task: ${e.message}`);
+    }
+    
+    // 4. Update points (Non-critical)
+    if (pointsOffset !== 0) {
+      try {
+        const userRef = doc(db, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+           const currentPoints = (userSnap.data() as UserData).totalPoints || 0;
+           await updateDoc(userRef, { totalPoints: Math.max(0, currentPoints + pointsOffset) });
+        }
+      } catch (e: any) {
+        console.warn(`[Delete Task] Failed to update user points:`, e.message);
+      }
+    }
   } else {
     await deleteDoc(doc(db, 'tasks', taskId));
   }
