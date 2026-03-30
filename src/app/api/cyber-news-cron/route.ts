@@ -43,7 +43,7 @@ Include emojis and bold titles.`;
           parts: [{ text: prompt }]
         }],
         tools: [{
-          googleSearchRetrieval: {} // Enable Google Search grounding
+          google_search: {} // Enable Google Search grounding
         }]
       })
     });
