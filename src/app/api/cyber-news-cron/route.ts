@@ -28,10 +28,14 @@ export async function GET(req: Request) {
 
   try {
     // 2. Fetch Latest Cybersecurity News via Gemini 2.5 Flash (Stable)
-    const prompt = `Act as a Cybersecurity Expert. Find 3-5 major cybersecurity news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}). 
-Provide a concise, user-friendly summary of each, including the potential impact.
-Format the output as a beautiful HTML-formatted message for Telegram. 
-Include emojis and bold titles.`;
+    const prompt = `Act as a Cybersecurity Expert. SEARCH the internet for the 3-5 most significant cybersecurity news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
+
+For EACH story, you MUST provide:
+- A bold headline with a relevant emoji
+- A concise summary (2-3 sentences)
+- The potential impact
+
+IMPORTANT: Do not just introduce the news. You MUST output the full summaries of the actual stories found. Use <b>bold</b> for titles and <i>italics</i> for emphasis. Format as a beautiful, ready-to-read Telegram message.`;
 
     const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
