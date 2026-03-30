@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/firebase/admin';
 import { format, addDays } from 'date-fns';
 
-const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 async function pushTelegramMessage(to: string, text: string) {
@@ -11,18 +10,6 @@ async function pushTelegramMessage(to: string, text: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: to, text }),
-  });
-}
-
-async function pushLineMessage(to: string, text: string) {
-  if (!CHANNEL_ACCESS_TOKEN) return;
-  return fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
-    },
-    body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
   });
 }
 
@@ -113,7 +100,7 @@ export async function GET(req: Request) {
     
     const pushTasks = usersSnap.docs.map(async (userDoc) => {
       const uData = userDoc.data();
-      if (!uData.telegramChatId && !uData.lineUserId) return;
+      if (!uData.telegramChatId) return;
 
       const [tasksSnap, logsSnap] = await Promise.all([
         dbAdmin.collection('tasks').where('userId', '==', userDoc.id).get(),
@@ -175,10 +162,9 @@ export async function GET(req: Request) {
 
       if (uData.telegramChatId) {
         await pushTelegramMessage(uData.telegramChatId, msg);
-      } else if (uData.lineUserId) {
-        await pushLineMessage(uData.lineUserId, msg);
+        return true;
       }
-      return true;
+      return false;
     });
 
     const pushed = await Promise.all(pushTasks);

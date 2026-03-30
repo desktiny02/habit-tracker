@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/firebase/admin';
 import * as admin from 'firebase-admin';
 
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 async function sendTelegramMessage(chatId: string, text: string) {
@@ -14,17 +14,7 @@ async function sendTelegramMessage(chatId: string, text: string) {
   });
 }
 
-async function sendLineMessage(to: string, text: string) {
-  if (!LINE_CHANNEL_ACCESS_TOKEN) return;
-  return fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
-    },
-    body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
-  });
-}
+
 
 export async function GET(req: Request) {
   const now = Date.now();
@@ -47,31 +37,22 @@ export async function GET(req: Request) {
       const userSnap = await dbAdmin.collection('users').doc(notif.userId).get();
       const userData = userSnap.data();
 
-      if (userData?.telegramChatId || userData?.lineUserId) {
+      if (userData?.telegramChatId) {
         try {
           const label = notif.itemType === 'event' ? 'Event' : 'Task';
           const message = `🔔 ${label} Reminder\n${notif.taskName}\n🕒 ${notif.scheduledTime}${notif.description ? `\n\n${notif.description}` : ''}`;
           
-          let res;
-          let method = 'none';
-          
-          if (userData.telegramChatId) {
-            res = await sendTelegramMessage(userData.telegramChatId, message);
-            method = 'telegram';
-          } else if (userData.lineUserId) {
-            res = await sendLineMessage(userData.lineUserId, message);
-            method = 'line';
-          }
-          
+          const res = await sendTelegramMessage(userData.telegramChatId, message);
           const status = res?.ok ? 'sent' : 'failed';
-          await ref.update({ status, sentAt: admin.firestore.FieldValue.serverTimestamp(), method });
-          results.push({ id, task: notif.taskName, status, method });
+          
+          await ref.update({ status, sentAt: admin.firestore.FieldValue.serverTimestamp(), method: 'telegram' });
+          results.push({ id, task: notif.taskName, status, method: 'telegram' });
         } catch (err: any) {
           console.error(`[Dispatch Error]:`, err);
           results.push({ id, task: notif.taskName, status: 'error', error: err.message });
         }
       } else {
-        await ref.update({ status: 'failed', error: 'No notification target found' });
+        await ref.update({ status: 'failed', error: 'No telegramChatId found' });
         results.push({ id, task: notif.taskName, status: 'failed', error: 'No target ID' });
       }
     }

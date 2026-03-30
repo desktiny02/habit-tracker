@@ -261,50 +261,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Connect Bot (Telegram) ────────────────────── */}
-        {userData && !userData.telegramChatId && (
-          <div 
-            className="rounded-[2rem] p-8 mb-8 border border-[var(--border)] overflow-hidden relative shadow-xl"
-            style={{ 
-              backgroundColor: 'var(--bg-surface)',
-              background: 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-raised) 100%)'
-            }}
-          >
-            <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
-              <div className="w-16 h-16 rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-500 shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-8 h-8">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Connect your Telegram Bot
-                </h3>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Get unlimited free reminders and check off tasks directly from your chat!
-                </p>
-              </div>
-              <div className="flex flex-col items-center p-4 px-6 rounded-2xl bg-[var(--bg-base)] border border-[var(--border-strong)] shadow-inner">
-                <span className="text-[10px] uppercase tracking-widest font-bold mb-1 opacity-50">Your Link PIN</span>
-                <span className="text-3xl font-mono font-black tracking-tighter text-[var(--accent)]">
-                  {userData.linePin || '------'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="mt-6 flex flex-wrap items-center gap-3 text-xs font-medium relative z-10">
-              <span className="px-3 py-1.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border)]">
-                1. Chat with <a href="https://t.me/MuHabitBot" target="_blank" className="text-sky-500 hover:underline">@MuHabitBot</a>
-              </span>
-              <span className="px-3 py-1.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border)]">
-                2. Type <code>/link {userData.linePin}</code>
-              </span>
-              <span className="px-3 py-1.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border)]">
-                3. Done! 🚀
-              </span>
-            </div>
-          </div>
-        )}
 
         <div className="space-y-8">
         {/* ── Stats ────────────────────────────────────── */}
