@@ -189,31 +189,60 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: true });
           }
 
-          const prompt = `You are an AI task extractor. Extract from: "${text}". Today is ${format(new Date(), 'yyyy-MM-dd')}. 
-Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "points":number, "priority":"high"|"medium"|"low", "required":boolean, "repeatType":"daily"|"weekly"|"once", "repeatDays":[0-6], "targetDate":"YYYY-MM-DD"}`;
+          const prompt = `You are an AI task extractor. Extract the following task/event from the user's message: "${text}". 
+Current date is ${format(new Date(), 'yyyy-MM-dd')}. 
+IMPORTANT: Your response MUST be a valid JSON object only.
+
+Schema:
+{
+  "itemType": "task" | "event",
+  "name": "string",
+  "description": "string", 
+  "points": number,
+  "priority": "high" | "medium" | "low",
+  "required": boolean,
+  "repeatType": "daily" | "weekly" | "once",
+  "repeatDays": number[] (0-6 Sun-Sat, only if weekly),
+  "targetDate": "YYYY-MM-DD" (only if once)
+}`;
           
-          // Using v1beta for the brand-new Gemini 3 series
+          // Use the newest Gemini 3 Flash Preview
           const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
           
           const aiRes = await fetch(aiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: prompt }]
+              }],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
           });
           
           const resJson = await aiRes.json();
           
           if (resJson.error) {
-              await sendTelegramMessage(chatId, `⚠️ <b>Gemini 3 Error:</b> ${resJson.error.message}\n<code>Code: ${resJson.error.code}</code>`);
+              await sendTelegramMessage(chatId, `⚠️ <b>Gemini 3 Error:</b> ${resJson.error.message}\n<code>Status: ${resJson.error.status}</code>`);
               return NextResponse.json({ success: true });
           }
 
-          const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!resJson.candidates || resJson.candidates.length === 0) {
+              const debugResp = JSON.stringify(resJson).substring(0, 500);
+              await sendTelegramMessage(chatId, `⚠️ <b>AI Error:</b> Empty response received.\n\nDebug: <code>${debugResp}</code>`);
+              return NextResponse.json({ success: true });
+          }
+
+          const textContent = resJson.candidates[0].content?.parts?.[0]?.text;
           
-          if (!textContent) throw new Error('AI returned empty response. Check API key status/project limits.');
+          if (!textContent) {
+              await sendTelegramMessage(chatId, "⚠️ <b>AI Error:</b> Response had no content.");
+              return NextResponse.json({ success: true });
+          }
           
-          const cleanJson = textContent.replace(/```json|```/g, '').trim();
-          const config = JSON.parse(cleanJson);
+          const config = JSON.parse(textContent.trim());
 
           if (!config || !config.name) throw new Error('AI failed to extract task name.');
 
@@ -230,7 +259,7 @@ Return JSON: {"itemType":"task"|"event", "name":"...", "description":"...", "poi
         }
       } catch (e: any) {
         console.error('[Telegram AI Parsing Error]:', e);
-        await sendTelegramMessage(chatId, `⚠️ <b>AI Parse Error:</b> ${e.message}`);
+        await sendTelegramMessage(chatId, `⚠️ <b>AI Parse Error:</b> ${e.message}\nPlease try using a simpler format.`);
       }
     }
 

@@ -84,9 +84,22 @@ export async function POST(req: Request) {
            try {
               const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
               
-              const prompt = `You are an AI task extractor. Parse this message: "${textMessage}". 
+              const prompt = `You are an AI task extractor. Extract the following task/event from the user's message: "${textMessage}". 
 Today is ${new Date().toISOString().split('T')[0]}.
-Return a JSON object: { "itemType": "task"|"event", "name": "...", "description": "...", "points": number, "priority": "high"|"medium"|"low", "required": boolean, "repeatType": "daily"|"weekly"|"once", "repeatDays": number[] (0-6 Sun-Sat, only if weekly), "targetDate": "YYYY-MM-DD" (only if once) }`;
+IMPORTANT: Your response MUST be a valid JSON object only.
+
+Schema:
+{
+  "itemType": "task" | "event",
+  "name": "string",
+  "description": "string", 
+  "points": number,
+  "priority": "high" | "medium" | "low",
+  "required": boolean,
+  "repeatType": "daily" | "weekly" | "once",
+  "repeatDays": number[] (0-6 Sun-Sat, only if weekly),
+  "targetDate": "YYYY-MM-DD" (only if once)
+}`;
 
               const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -94,8 +107,12 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generation_config: { temperature: 0.1 }
+                    contents: [{
+                       parts: [{ text: prompt }]
+                    }],
+                    generationConfig: {
+                       responseMimeType: "application/json"
+                    }
                  })
               });
 
@@ -105,9 +122,15 @@ Return a JSON object: { "itemType": "task"|"event", "name": "...", "description"
                  continue;
               }
 
-              const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (!resJson.candidates || resJson.candidates.length === 0) {
+                 await replyMessage(replyToken, "⚠️ AI Error: Empty response received.");
+                 continue;
+              }
+
+              const textContent = resJson.candidates[0].content?.parts?.[0]?.text;
               if (!textContent) {
-                 throw new Error('AI Candidate text is empty. Check your prompt or context limits.');
+                 await replyMessage(replyToken, "⚠️ AI Error: Response had no content.");
+                 continue;
               }
 
               // Strip down markdown backticks like ```json if Gemini included them
