@@ -101,7 +101,7 @@ Schema:
   "targetDate": "YYYY-MM-DD" (only if once)
 }`;
 
-              const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+              const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
               const aiRes = await fetch(aiUrl, {
                  method: 'POST',
@@ -118,7 +118,7 @@ Schema:
 
               const resJson = await aiRes.json();
               if (resJson.error) {
-                 await replyMessage(replyToken, `⚠️ Gemini 3 Error: ${resJson.error.message}`);
+                 await replyMessage(replyToken, `⚠️ Gemini Error: ${resJson.error.message}`);
                  continue;
               }
 

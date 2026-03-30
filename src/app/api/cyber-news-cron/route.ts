@@ -33,7 +33,7 @@ Provide a concise, user-friendly summary of each, including the potential impact
 Format the output as a beautiful HTML-formatted message for Telegram. 
 Include emojis and bold titles.`;
 
-    const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+    const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const aiRes = await fetch(aiUrl, {
       method: 'POST',
