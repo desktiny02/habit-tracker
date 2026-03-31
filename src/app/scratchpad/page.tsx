@@ -15,6 +15,7 @@ interface ScratchpadNote {
   content: string;
   createdAt: number;
   expiresAt: number | null;
+  linkedEventDate?: string;
 }
 
 export default function ScratchpadPage() {
@@ -22,6 +23,8 @@ export default function ScratchpadPage() {
   const [notes, setNotes] = useState<ScratchpadNote[]>([]);
   const [content, setContent] = useState('');
   const [expiration, setExpiration] = useState('1-week');
+  const [isEventLinked, setIsEventLinked] = useState(false);
+  const [eventDate, setEventDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [isSaving, setIsSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +49,7 @@ export default function ScratchpadPage() {
           content: data.content,
           createdAt: data.createdAt,
           expiresAt: data.expiresAt,
+          linkedEventDate: data.linkedEventDate,
         };
 
         if (note.expiresAt !== null && note.expiresAt < now) {
@@ -84,22 +88,53 @@ export default function ScratchpadPage() {
     try {
       const now = Date.now();
       let expiresAt: number | null = null;
-      if (expiration === '1-day') expiresAt = now + 24 * 60 * 60 * 1000;
-      else if (expiration === '1-week') expiresAt = now + 7 * 24 * 60 * 60 * 1000;
-      else if (expiration === '1-month') expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+      let targetEventDate: string | null = null;
+
+      if (isEventLinked) {
+        targetEventDate = eventDate;
+        // Expire 1 full day after the event date (adding 48 hours from midnight of that day as safety)
+        const eventTimestamp = new Date(eventDate + 'T00:00:00').getTime();
+        expiresAt = eventTimestamp + (2 * 24 * 60 * 60 * 1000);
+      } else {
+        if (expiration === '1-day') expiresAt = now + 24 * 60 * 60 * 1000;
+        else if (expiration === '1-week') expiresAt = now + 7 * 24 * 60 * 60 * 1000;
+        else if (expiration === '1-month') expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+      }
 
       await addDoc(collection(db, 'scratchpads'), {
         userId: user.uid,
         content: htmlContent,
         createdAt: now,
         expiresAt: expiresAt,
+        ...(isEventLinked && { linkedEventDate: targetEventDate }),
       });
 
-      toast.success('Note saved!');
+      // Create linked event in Tasks
+      if (isEventLinked && targetEventDate) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        const textContent = tempDiv.textContent || tempDiv.innerText || '';
+        const title = textContent.trim().substring(0, 40) + (textContent.length > 40 ? '...' : '');
+
+        await addDoc(collection(db, 'tasks'), {
+          userId: user.uid,
+          name: `📝 ${title || 'Scratchpad Note'}`,
+          description: 'Linked from Scratchpad',
+          itemType: 'event',
+          priority: 'medium',
+          required: false,
+          repeatType: 'once',
+          targetDate: targetEventDate,
+          createdAt: now,
+        });
+      }
+
+      toast.success(isEventLinked ? 'Note saved and Event created!' : 'Note saved!');
       if (editorRef.current) {
         editorRef.current.innerHTML = '';
       }
       setContent('');
+      setIsEventLinked(false);
       setExpiration('1-week');
     } catch (error: any) {
       toast.error('Failed to save note');
@@ -174,21 +209,50 @@ export default function ScratchpadPage() {
           />
 
           {/* Footer Controls */}
-          <div className="flex items-center justify-between p-3 border-t bg-black/5" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2">
-              <Clock size={16} style={{ color: 'var(--text-muted)' }} />
-              <select
-                value={expiration}
-                onChange={(e) => setExpiration(e.target.value)}
-                className="text-sm rounded-lg px-2 py-1 focus:outline-none border"
-                style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}
-              >
-                <option value="1-day">Expire in 1 Day</option>
-                <option value="1-week">Expire in 1 Week</option>
-                <option value="1-month">Expire in 1 Month</option>
-                <option value="forever">Keep Forever</option>
-              </select>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-t bg-black/5" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Normal Expiration */}
+              {!isEventLinked && (
+                <div className="flex items-center gap-2">
+                  <Clock size={16} style={{ color: 'var(--text-muted)' }} />
+                  <select
+                    value={expiration}
+                    onChange={(e) => setExpiration(e.target.value)}
+                    className="text-sm rounded-lg px-2 py-1 focus:outline-none border border-transparent hover:border-white/10"
+                    style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="1-day">Expire in 1 Day</option>
+                    <option value="1-week">Expire in 1 Week</option>
+                    <option value="1-month">Expire in 1 Month</option>
+                    <option value="forever">Keep Forever</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Event Reminder Toggle */}
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={isEventLinked} 
+                    onChange={(e) => setIsEventLinked(e.target.checked)}
+                    className="rounded border-gray-500 text-indigo-500 focus:ring-indigo-500 bg-transparent w-4 h-4 cursor-pointer"
+                  />
+                  Set Event Reminder
+                </label>
+                
+                {isEventLinked && (
+                  <input 
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="text-sm rounded-lg px-2 py-0.5 border focus:outline-none"
+                    style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}
+                  />
+                )}
+              </div>
             </div>
+
             <button
               onClick={handleSave}
               disabled={isSaving}
@@ -230,7 +294,11 @@ export default function ScratchpadPage() {
                       <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
                         Created: {format(note.createdAt, 'MMM d, h:mm a')}
                         <br/>
-                        {note.expiresAt ? `Expires: ${format(note.expiresAt, 'MMM d, h:mm a')}` : 'Kept Forever'}
+                        {note.linkedEventDate ? (
+                           <span className="text-sky-400 font-semibold text-[11px]">Event on {format(new Date(note.linkedEventDate), 'MMM d, yyyy')}</span>
+                        ) : (
+                           note.expiresAt ? `Expires: ${format(note.expiresAt, 'MMM d, yyyy')}` : 'Kept Forever'
+                        )}
                       </div>
                       <button
                         onClick={() => handleDelete(note.id)}
