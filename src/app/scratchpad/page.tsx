@@ -4,16 +4,16 @@ import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/lib/firebase/auth';
 import { db } from '@/lib/firebase/config';
 import { createTask } from '@/lib/firebase/firestore';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Trash2, Bold, Italic, Underline, List, Clock, Save, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface ScratchpadNote {
+interface ScratchNote {
   id: string;
   userId: string;
-  content: string;
+  content: string; // Stored in 'description' of task
   createdAt: number;
   expiresAt: number | null;
   linkedEventDate?: string;
@@ -21,46 +21,45 @@ interface ScratchpadNote {
 
 export default function ScratchpadPage() {
   const { user, loading } = useAuth();
-  const [notes, setNotes] = useState<ScratchpadNote[]>([]);
-  const [content, setContent] = useState('');
+  const [notes, setNotes] = useState<ScratchNote[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
   const [expiration, setExpiration] = useState('1-week');
   const [isEventLinked, setIsEventLinked] = useState(false);
   const [eventDate, setEventDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [isSaving, setIsSaving] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
 
+    // We use the 'tasks' collection with itemType 'scratch_note' to bypass rule deployment issues
     const q = query(
-      collection(db, 'scratchpads'),
-      where('userId', '==', user.uid)
+      collection(db, 'tasks'),
+      where('userId', '==', user.uid),
+      where('itemType', '==', 'scratch_note')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const now = Date.now();
-      const fetchedNotes: ScratchpadNote[] = [];
+      const fetchedNotes: ScratchNote[] = [];
 
       snapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data();
-        const note: ScratchpadNote = {
+        const note: ScratchNote = {
           id: docSnapshot.id,
           userId: data.userId,
-          content: data.content,
+          content: data.description || '',
           createdAt: data.createdAt,
-          expiresAt: data.expiresAt,
+          expiresAt: data.expiresAt || null,
           linkedEventDate: data.linkedEventDate,
         };
 
         if (note.expiresAt !== null && note.expiresAt < now) {
-          // Expired, we should delete it from db
-          deleteDoc(doc(db, 'scratchpads', note.id)).catch(console.error);
+          deleteDoc(doc(db, 'tasks', note.id)).catch(console.error);
         } else {
           fetchedNotes.push(note);
         }
       });
 
-      // Sort by newest first
       fetchedNotes.sort((a, b) => b.createdAt - a.createdAt);
       setNotes(fetchedNotes);
     });
@@ -70,9 +69,7 @@ export default function ScratchpadPage() {
 
   const handleFormat = (command: string) => {
     document.execCommand(command, false, undefined);
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
+    editorRef.current?.focus();
   };
 
   const handleSave = async () => {
@@ -91,7 +88,6 @@ export default function ScratchpadPage() {
 
       if (isEventLinked) {
         targetEventDate = eventDate;
-        // Expire 1 full day after the event date (adding 48 hours from midnight of that day as safety)
         const eventTimestamp = new Date(eventDate + 'T00:00:00').getTime();
         expiresAt = eventTimestamp + (2 * 24 * 60 * 60 * 1000);
       } else {
@@ -100,15 +96,24 @@ export default function ScratchpadPage() {
         else if (expiration === '1-month') expiresAt = now + 30 * 24 * 60 * 60 * 1000;
       }
 
-      await addDoc(collection(db, 'scratchpads'), {
+      // Save the note as a special task type
+      await createTask({
         userId: user.uid,
-        content: htmlContent,
-        createdAt: now,
-        expiresAt: expiresAt,
-        ...(isEventLinked && { linkedEventDate: targetEventDate }),
+        name: 'Scratchpad Note',
+        description: htmlContent, // Store HTML in description
+        itemType: 'scratch_note' as any,
+        points: 0,
+        priority: 'low',
+        required: false,
+        repeatType: 'once',
+        // Add custom fields
+        ...({
+           expiresAt,
+           linkedEventDate: targetEventDate || null
+        } as any)
       });
 
-      // Create linked event in Tasks
+      // Create linked event if requested
       if (isEventLinked && targetEventDate) {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = htmlContent;
@@ -128,16 +133,13 @@ export default function ScratchpadPage() {
         });
       }
 
-      toast.success(isEventLinked ? 'Note saved and Event created!' : 'Note saved!');
-      if (editorRef.current) {
-        editorRef.current.innerHTML = '';
-      }
-      setContent('');
+      toast.success(isEventLinked ? 'Note & Event created!' : 'Note saved!');
+      if (editorRef.current) editorRef.current.innerHTML = '';
       setIsEventLinked(false);
       setExpiration('1-week');
     } catch (error: any) {
       console.error('Save error:', error);
-      toast.error('Failed to save note');
+      toast.error(`Failed to save: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -145,7 +147,7 @@ export default function ScratchpadPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'scratchpads', id));
+      await deleteDoc(doc(db, 'tasks', id));
       toast.success('Note removed');
     } catch (error) {
       toast.error('Failed to remove note');
@@ -181,37 +183,24 @@ export default function ScratchpadPage() {
 
         {/* Editor Area */}
         <div className="rounded-2xl overflow-hidden border" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-          {/* Toolbar */}
           <div className="flex items-center gap-1 p-2 border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-raised)' }}>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className="p-2 rounded hover:bg-black/10 transition-colors" title="Bold">
-              <Bold size={16} />
-            </button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className="p-2 rounded hover:bg-black/10 transition-colors" title="Italic">
-              <Italic size={16} />
-            </button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className="p-2 rounded hover:bg-black/10 transition-colors" title="Underline">
-              <Underline size={16} />
-            </button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className="p-2 rounded hover:bg-black/10 transition-colors"><Bold size={16} /></button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className="p-2 rounded hover:bg-black/10 transition-colors"><Italic size={16} /></button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className="p-2 rounded hover:bg-black/10 transition-colors"><Underline size={16} /></button>
             <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--border)' }}></div>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('insertUnorderedList')} className="p-2 rounded hover:bg-black/10 transition-colors" title="Bullet List">
-              <List size={16} />
-            </button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('insertUnorderedList')} className="p-2 rounded hover:bg-black/10 transition-colors"><List size={16} /></button>
           </div>
 
-          {/* Editor */}
           <div
             ref={editorRef}
             contentEditable
-            onInput={(e) => setContent(e.currentTarget.innerHTML)}
             className="p-4 min-h-[120px] focus:outline-none"
             style={{ color: 'var(--text-primary)' }}
             data-placeholder="Jot something down..."
           />
 
-          {/* Footer Controls */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-t bg-black/5" style={{ borderColor: 'var(--border)' }}>
             <div className="flex flex-wrap items-center gap-4">
-              {/* Normal Expiration */}
               {!isEventLinked && (
                 <div className="flex items-center gap-2">
                   <Clock size={16} style={{ color: 'var(--text-muted)' }} />
@@ -229,26 +218,13 @@ export default function ScratchpadPage() {
                 </div>
               )}
 
-              {/* Event Reminder Toggle */}
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={isEventLinked} 
-                    onChange={(e) => setIsEventLinked(e.target.checked)}
-                    className="rounded border-gray-500 text-indigo-500 focus:ring-indigo-500 bg-transparent w-4 h-4 cursor-pointer"
-                  />
+                  <input type="checkbox" checked={isEventLinked} onChange={(e) => setIsEventLinked(e.target.checked)} className="rounded border-gray-500 text-indigo-500 w-4 h-4" />
                   Set Event Reminder
                 </label>
-                
                 {isEventLinked && (
-                  <input 
-                    type="date"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    className="text-sm rounded-lg px-2 py-0.5 border focus:outline-none"
-                    style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}
-                  />
+                  <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className="text-sm rounded-lg px-2 py-0.5 border" style={{ backgroundColor: 'var(--bg-raised)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
                 )}
               </div>
             </div>
@@ -259,8 +235,7 @@ export default function ScratchpadPage() {
               className="px-4 py-2 rounded-xl text-sm font-bold text-white flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: 'var(--accent)' }}
             >
-              <Save size={16} />
-              Save Note
+              <Save size={16} /> Save Note
             </button>
           </div>
         </div>
@@ -277,19 +252,9 @@ export default function ScratchpadPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {notes.map((note) => (
                 <div key={note.id} className="rounded-2xl p-4 border relative group overflow-hidden" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-strong)' }}>
-                  
-                  {/* Decorative corner curve */}
                   <div className="absolute top-0 right-0 w-8 h-8 rounded-bl-xl bg-black/10 z-0"></div>
-
                   <div className="relative z-10 flex flex-col h-full">
-                    {/* Note content */}
-                    <div 
-                      className="prose prose-sm prose-invert mb-4 flex-1 text-sm break-words content-renderer"
-                      style={{ color: 'var(--text-primary)' }}
-                      dangerouslySetInnerHTML={{ __html: note.content }}
-                    />
-                    
-                    {/* Meta info & Delete */}
+                    <div className="prose prose-sm prose-invert mb-4 flex-1 text-sm break-words content-renderer" style={{ color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: note.content }} />
                     <div className="flex items-center justify-between pt-3 border-t mt-auto" style={{ borderColor: 'var(--border)' }}>
                       <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
                         Created: {format(note.createdAt, 'MMM d, h:mm a')}
@@ -300,13 +265,7 @@ export default function ScratchpadPage() {
                            note.expiresAt ? `Expires: ${format(note.expiresAt, 'MMM d, yyyy')}` : 'Kept Forever'
                         )}
                       </div>
-                      <button
-                        onClick={() => handleDelete(note.id)}
-                        className="p-2 rounded-xl text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Delete note"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <button onClick={() => handleDelete(note.id)} className="p-2 rounded-xl text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>
                     </div>
                   </div>
                 </div>
@@ -314,23 +273,16 @@ export default function ScratchpadPage() {
             </div>
           )}
         </div>
-
       </div>
       
       <style dangerouslySetInnerHTML={{__html: `
-        [contentEditable=true]:empty:before {
-          content: attr(data-placeholder);
-          color: var(--text-muted);
-          pointer-events: none;
-          display: block; /* For Firefox */
-        }
+        [contentEditable=true]:empty:before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; display: block; }
         .content-renderer ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
         .content-renderer ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
         .content-renderer u { text-decoration: underline; }
         .content-renderer b, .content-renderer strong { font-weight: bold; }
         .content-renderer i, .content-renderer em { font-style: italic; }
       `}} />
-
     </AppLayout>
   );
 }

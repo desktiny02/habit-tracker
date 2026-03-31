@@ -175,7 +175,10 @@ export const updateTask = async (taskId: string, updates: Partial<Omit<Task, 'id
 export const getUserTasks = async (userId: string) => {
   const q = query(collection(db, 'tasks'), where('userId', '==', userId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => d.data() as Task);
+  // Filter out meta-types like 'scratch_note' which are handled on specific pages
+  return snapshot.docs
+    .map(d => d.data() as Task)
+    .filter(t => t.itemType !== ('scratch_note' as any));
 };
 
 export const deleteTask = async (taskId: string, userId?: string) => {
@@ -375,9 +378,9 @@ export const autoMissPendingTasks = async (
 ): Promise<number> => {
   const dayOfWeek = new Date(date + 'T12:00:00').getDay();
 
-  // Only auto-miss TASKS — events have no points and should not be auto-missed
+  // Only auto-miss TASKS — events/notes have no points and should not be auto-missed
   const scheduledTasks = tasks.filter((t) => {
-    if (t.itemType === 'event') return false;
+    if (t.itemType === 'event' || (t.itemType as any) === 'scratch_note') return false;
     if (t.repeatType === 'daily') return true;
     if (t.repeatType === 'weekly') return t.repeatDays?.includes(dayOfWeek) ?? false;
     if (t.repeatType === 'once') return t.targetDate === date;

@@ -52,11 +52,13 @@ export default function CalendarPage() {
         const [snapsLogs, snapsTasks] = await Promise.all([getDocs(qLogs), getDocs(qTasks)]);
 
         const allLogs = snapsLogs.docs.map((d) => d.data() as DailyLog);
-        const allTasks = snapsTasks.docs.map((d) => {
-          const t = d.data() as Task;
-          t.id = d.id;
-          return t;
-        });
+        const allTasks = snapsTasks.docs
+          .map((d) => {
+            const t = d.data() as Task;
+            t.id = d.id;
+            return t;
+          })
+          .filter(t => (t.itemType as any) !== 'scratch_note');
         
         // Filter logs client-side to avoid requiring composite indexes
         const filteredLogs = allLogs.filter(l => l.date >= startStr && l.date <= endStr);

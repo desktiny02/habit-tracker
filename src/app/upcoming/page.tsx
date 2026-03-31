@@ -30,7 +30,9 @@ export default function UpcomingPage() {
       try {
         const q = query(collection(db, 'tasks'), where('userId', '==', user.uid));
         const snap = await getDocs(q);
-        const allItems = snap.docs.map(d => d.data() as Task);
+        const allItems = snap.docs
+          .map(d => d.data() as Task)
+          .filter(t => (t.itemType as any) !== 'scratch_note');
 
         const upcomingItems = allItems.filter(item => {
           if (item.repeatType === 'daily' || item.repeatType === 'weekly') return true;
