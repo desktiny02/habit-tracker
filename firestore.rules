@@ -81,5 +81,14 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
     }
+
+    // ── Scratchpads ──────────────────────────────────────────────────
+    match /scratchpads/{scratchpadId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId)
+        && request.resource.data.content.size() <= 10000;
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
   }
 }

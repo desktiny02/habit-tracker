@@ -3,7 +3,8 @@
 import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/lib/firebase/auth';
 import { db } from '@/lib/firebase/config';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { createTask } from '@/lib/firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Trash2, Bold, Italic, Underline, List, Clock, Save, StickyNote } from 'lucide-react';
@@ -39,7 +40,6 @@ export default function ScratchpadPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const now = Date.now();
       const fetchedNotes: ScratchpadNote[] = [];
-      let cleanupNeeded = false;
 
       snapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data();
@@ -54,7 +54,6 @@ export default function ScratchpadPage() {
 
         if (note.expiresAt !== null && note.expiresAt < now) {
           // Expired, we should delete it from db
-          cleanupNeeded = true;
           deleteDoc(doc(db, 'scratchpads', note.id)).catch(console.error);
         } else {
           fetchedNotes.push(note);
@@ -116,16 +115,16 @@ export default function ScratchpadPage() {
         const textContent = tempDiv.textContent || tempDiv.innerText || '';
         const title = textContent.trim().substring(0, 40) + (textContent.length > 40 ? '...' : '');
 
-        await addDoc(collection(db, 'tasks'), {
+        await createTask({
           userId: user.uid,
           name: `📝 ${title || 'Scratchpad Note'}`,
           description: 'Linked from Scratchpad',
           itemType: 'event',
+          points: 0,
           priority: 'medium',
           required: false,
           repeatType: 'once',
           targetDate: targetEventDate,
-          createdAt: now,
         });
       }
 
@@ -137,6 +136,7 @@ export default function ScratchpadPage() {
       setIsEventLinked(false);
       setExpiration('1-week');
     } catch (error: any) {
+      console.error('Save error:', error);
       toast.error('Failed to save note');
     } finally {
       setIsSaving(false);
