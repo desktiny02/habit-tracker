@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, CheckSquare, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon, BarChart3, HelpCircle, User as UserIcon, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Gift, Calendar as CalendarIcon, LogOut, History as HistoryIcon, BarChart3, HelpCircle, Sun, Moon } from 'lucide-react';
 import { auth, db } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -90,16 +90,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {/* Logo */}
         <div className="px-5 pt-6 pb-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80"
-            style={{ color: 'var(--accent)' }}
-          >
-            <CheckSquare className="w-5 h-5" />
-            Habit Tracker
+          <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80 group">
+            {/* Logomark — gradient diamond with checkmark */}
+            <div className="shrink-0 w-8 h-8">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#6366f1"/>
+                    <stop offset="100%" stopColor="#8b5cf6"/>
+                  </linearGradient>
+                  <linearGradient id="logoGradHover" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#818cf8"/>
+                    <stop offset="100%" stopColor="#a78bfa"/>
+                  </linearGradient>
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                </defs>
+                {/* Rounded square bg */}
+                <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#logoGrad)" opacity="0.15"/>
+                <rect x="1" y="1" width="30" height="30" rx="9" stroke="url(#logoGrad)" strokeWidth="1.5" fill="none"/>
+                {/* Checkmark */}
+                <path d="M9 16.5L13.5 21L23 11" stroke="url(#logoGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#glow)"/>
+              </svg>
+            </div>
+            {/* Wordmark */}
+            <div className="flex flex-col -space-y-0.5">
+              <span className="text-[15px] font-extrabold tracking-tight leading-none" style={{
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}>HabitOS</span>
+              <span className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Daily Tracker</span>
+            </div>
           </Link>
-          <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+          <div className="mt-2 flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             BKK: {bkkTime}
           </div>
         </div>
