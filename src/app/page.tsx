@@ -262,34 +262,55 @@ export default function DashboardPage() {
         )}
 
 
-        <div className="space-y-8">
-        {/* ── Stats ────────────────────────────────────── */}
-        <div className="w-full relative overflow-hidden rounded-[2rem] p-8 md:p-10 text-white"
+        <div className="space-y-6">
+        {/* ── Stats Hero ─────────────────────────────────── */}
+        <div className="w-full relative overflow-hidden rounded-[24px] p-7 md:p-8"
           style={{
-            background: 'linear-gradient(135deg, rgba(99,102,241,1) 0%, rgba(139,92,246,1) 100%)',
-            boxShadow: '0 12px 30px -10px rgba(99,102,241,0.5)',
+            background: 'linear-gradient(135deg, #0e1120 0%, #12163a 50%, #0e1120 100%)',
+            border: '1px solid rgba(124,110,245,0.2)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(124,110,245,0.08)',
           }}
         >
-          {/* Decorative shapes */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl -mt-20 -mr-20 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-400 opacity-20 rounded-full blur-2xl -mb-10 -ml-10 pointer-events-none" />
+          {/* Decorative mesh */}
+          <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-3xl -mt-24 -mr-24 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(124,110,245,0.18) 0%, transparent 70%)' }} />
+          <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-3xl -mb-14 -ml-14 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(90,110,240,0.14) 0%, transparent 70%)' }} />
 
-          <div className="relative z-10 flex justify-between items-start">
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div>
-              <h2 className="text-sm md:text-base font-bold uppercase tracking-widest text-white/80 mb-2">
-                Available Balance
-              </h2>
-              <div className="flex items-baseline gap-3">
-                <span className="text-6xl md:text-7xl font-extrabold tracking-tight drop-shadow-md">
+              {/* Label */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
+                <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>
+                  Account Rewards
+                </span>
+              </div>
+
+              {/* Balance */}
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl md:text-6xl font-extrabold tracking-tight text-white">
                   {totalPoints}
                 </span>
-                <span className="text-xl md:text-2xl font-bold opacity-80">pts</span>
+                <span className="text-xl font-bold" style={{ color: 'rgba(255,255,255,0.5)' }}>pts</span>
               </div>
-              <p className="mt-2 text-sm md:text-base text-white/90 font-medium">
+
+              <p className="mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
                 Keep completing habits to grow your rewards!
               </p>
             </div>
-            
+
+            {/* Redeem CTA */}
+            <button
+              onClick={() => router.push('/rewards')}
+              className="shrink-0 px-6 py-3 rounded-2xl text-sm font-bold transition-all duration-200 hover:opacity-90 active:scale-[0.97] whitespace-nowrap"
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              Redeem Points
+            </button>
           </div>
         </div>
 

@@ -70,6 +70,7 @@ export interface Reward {
   userId: string;
   name: string;
   cost: number;
+  category?: string;
 }
 
 export interface Redemption {
@@ -84,7 +85,7 @@ export interface Redemption {
 
 // Priority helpers
 export const PRIORITY_CONFIG = {
-  high:   { label: 'High',   color: '#ef4444', bg: 'rgba(239,68,68,0.12)',  missMultiplier: 1.0 },
-  medium: { label: 'Medium', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', missMultiplier: 0.5 },
-  low:    { label: 'Low',    color: '#64748b', bg: 'rgba(100,116,139,0.12)', missMultiplier: 0.3 },
+  high:   { label: 'High',   color: '#f0526e', bg: 'rgba(240,82,110,0.12)',  missMultiplier: 1.0 },
+  medium: { label: 'Medium', color: '#7c6ef5', bg: 'rgba(124,110,245,0.12)', missMultiplier: 0.5 },
+  low:    { label: 'Low',    color: '#2ecc8e', bg: 'rgba(46,204,142,0.1)',   missMultiplier: 0.3 },
 } as const;

@@ -8,18 +8,19 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', style, ...props }, ref) => {
-    // Build inline style per variant to respect CSS variables
     const variantStyle: React.CSSProperties = (() => {
       switch (variant) {
         case 'primary':
           return {
-            backgroundColor: 'var(--accent)',
+            background: 'linear-gradient(135deg, #7c6ef5, #5a6ef0)',
             color: '#fff',
+            boxShadow: '0 4px 14px rgba(124,110,245,0.3)',
           };
         case 'secondary':
           return {
-            backgroundColor: 'var(--bg-raised)',
+            backgroundColor: 'var(--bg-elevated)',
             color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
           };
         case 'outline':
           return {
@@ -34,8 +35,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           };
         case 'danger':
           return {
-            backgroundColor: '#ef4444',
+            backgroundColor: 'var(--danger)',
             color: '#fff',
+            boxShadow: '0 4px 12px rgba(240,82,110,0.25)',
           };
         default:
           return {};
@@ -46,17 +48,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center rounded-xl font-medium transition-all duration-150',
+          'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
           'disabled:pointer-events-none disabled:opacity-50',
           'active:scale-[0.97]',
-          // Hover handled via opacity tweak — works across all variants
           'hover:opacity-90',
           {
             'shadow-sm': variant === 'primary' || variant === 'danger',
-            'h-9 px-4 text-sm': size === 'sm',
-            'h-11 px-5 text-sm': size === 'md',
-            'h-12 px-7 text-base rounded-2xl': size === 'lg',
+            'h-9 px-4 text-sm gap-1.5': size === 'sm',
+            'h-10 px-5 text-sm gap-2': size === 'md',
+            'h-12 px-7 text-sm rounded-2xl gap-2': size === 'lg',
           },
           className
         )}

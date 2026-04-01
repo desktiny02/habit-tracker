@@ -1,63 +1,79 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 /* ── Design Tokens ─────────────────────────────────────────────── */
 :root {
-  /* Backgrounds */
-  --bg-base:    #0f172a;   /* deep navy — page background */
-  --bg-surface: #1e293b;   /* slate 800 — card / panel */
-  --bg-raised:  #334155;   /* slate 700 — hover, input */
+  /* Backgrounds — deep cool navy inspired by the screenshots */
+  --bg-base:    #080a12;   /* near-black with blue tint */
+  --bg-surface: #0e1120;   /* deep navy — card / panel */
+  --bg-raised:  #151829;   /* lighter navy — hover, input */
+  --bg-elevated: #1c2035;  /* elevated surfaces */
 
   /* Text */
-  --text-primary:   #e2e8f0;  /* slate 200 — body */
-  --text-secondary: #94a3b8;  /* slate 400 — muted / labels */
-  --text-muted:     #64748b;  /* slate 500 — placeholders */
+  --text-primary:   #e8ecf8;  /* cool white */
+  --text-secondary: #8892b0;  /* muted blue-grey */
+  --text-muted:     #4a5278;  /* very muted */
 
-  /* Accent — indigo/violet */
-  --accent:          #6366f1;  /* indigo 500 */
-  --accent-hover:    #4f46e5;  /* indigo 600 */
-  --accent-subtle:   rgba(99, 102, 241, 0.12);
+  /* Accent — indigo/violet matching screenshots */
+  --accent:          #7c6ef5;  /* purple-indigo */
+  --accent-secondary: #5a6ef0; /* cooler indigo */
+  --accent-hover:    #6b5df0;
+  --accent-subtle:   rgba(124, 110, 245, 0.1);
+  --accent-glow:     rgba(124, 110, 245, 0.25);
 
-  /* Borders */
-  --border:        rgba(255,255,255,0.08);
-  --border-strong: rgba(255,255,255,0.14);
+  /* Borders — subtle with glow option */
+  --border:           rgba(124, 110, 245, 0.08);
+  --border-strong:    rgba(124, 110, 245, 0.18);
+  --border-dashed:    rgba(90, 110, 240, 0.35);
 
   /* Semantic */
-  --success: #34d399;  /* emerald 400 */
-  --danger:  #f87171;  /* red 400 */
-  --warning: #fbbf24;  /* amber 400 */
+  --success: #2ecc8e;  /* green */
+  --danger:  #f0526e;  /* danger red */
+  --warning: #f5a623;  /* amber */
+
+  /* Priority Colors */
+  --priority-high-bg:    rgba(240, 82, 110, 0.12);
+  --priority-high-color: #f0526e;
+  --priority-medium-bg:  rgba(124, 110, 245, 0.12);
+  --priority-medium-color: #7c6ef5;
+  --priority-low-bg:     rgba(46, 204, 142, 0.1);
+  --priority-low-color:  #2ecc8e;
 
   /* Radii */
   --radius-sm:  8px;
   --radius-md:  12px;
   --radius-lg:  16px;
-  --radius-xl:  24px;
+  --radius-xl:  20px;
+  --radius-2xl: 24px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  /* Shadows — richer depth */
+  --shadow-sm:   0 1px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,110,245,0.04);
+  --shadow-md:   0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,110,245,0.06);
+  --shadow-lg:   0 12px 40px rgba(0,0,0,0.6);
+  --shadow-glow: 0 0 20px rgba(124,110,245,0.2);
 }
 
 html[data-theme="light"] {
-  /* Backgrounds */
-  --bg-base:    #f8fafc;   /* slate 50 */
-  --bg-surface: #ffffff;   /* white */
-  --bg-raised:  #f1f5f9;   /* slate 100 — hover, inputs */
+  --bg-base:    #f0f2f8;
+  --bg-surface: #ffffff;
+  --bg-raised:  #eef0f7;
+  --bg-elevated: #e8eaf4;
 
-  /* Text */
-  --text-primary:   #0f172a;  /* slate 900 */
-  --text-secondary: #475569;  /* slate 600 */
-  --text-muted:     #94a3b8;  /* slate 400 */
+  --text-primary:   #0f1220;
+  --text-secondary: #475080;
+  --text-muted:     #8892b0;
 
-  /* Borders */
-  --border:        rgba(0,0,0,0.06);
-  --border-strong: rgba(0,0,0,0.1);
+  --border:        rgba(90, 110, 240, 0.1);
+  --border-strong: rgba(90, 110, 240, 0.18);
+  --border-dashed: rgba(90, 110, 240, 0.3);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.02);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.1);
+  --shadow-glow: 0 0 20px rgba(124,110,245,0.12);
 
-  /* Accent sub backdrop */
-  --accent-subtle: rgba(99, 102, 241, 0.08);
+  --accent-subtle: rgba(124, 110, 245, 0.08);
+  --accent-glow: rgba(124, 110, 245, 0.15);
 }
 
 /* ── Base ─────────────────────────────────────────────────────── */
@@ -77,26 +93,26 @@ body {
   flex-direction: column;
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-geist-sans, 'Inter', ui-sans-serif, system-ui, sans-serif);
+  font-family: 'Inter', var(--font-geist-sans, ui-sans-serif, system-ui, sans-serif);
   font-size: 1rem;
   line-height: 1.6;
   letter-spacing: -0.01em;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar          { width: 6px; height: 6px; }
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track    { background: transparent; }
-::-webkit-scrollbar-thumb    { background: var(--bg-raised); border-radius: 99px; }
+::-webkit-scrollbar-thumb    { background: var(--bg-elevated); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-/* Focus */
+/* ── Focus ──────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* Selection */
+/* ── Selection ──────────────────────────────────────────────────── */
 ::selection {
   background: var(--accent-subtle);
   color: var(--text-primary);
@@ -106,25 +122,86 @@ body {
 h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
 }
 
 p, li {
-  color: var(--text-primary);
+  color: var(--text-secondary);
   line-height: 1.65;
 }
+
+/* ── Sidebar Nav Item Dashed-Border Effect (from screenshots) ────── */
+.nav-item-inactive {
+  position: relative;
+  border: 1px dashed transparent;
+  transition: all 0.2s ease;
+}
+
+.nav-item-inactive:hover {
+  border-color: var(--border-dashed);
+  background: rgba(124, 110, 245, 0.04);
+}
+
+.nav-item-active {
+  background: linear-gradient(135deg, rgba(124,110,245,0.18), rgba(90,110,240,0.12)) !important;
+  border: 1px solid rgba(124, 110, 245, 0.3) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Card Styles ─────────────────────────────────────────────── */
+.card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+/* ── Priority Badges ─────────────────────────────────────────────── */
+.badge-high     { background: var(--priority-high-bg);   color: var(--priority-high-color);   }
+.badge-medium   { background: var(--priority-medium-bg); color: var(--priority-medium-color); }
+.badge-low      { background: var(--priority-low-bg);    color: var(--priority-low-color);    }
+.badge-event    { background: rgba(90,110,240,0.1);       color: #5a6ef0; }
+
+/* ── Glassmorphism utility ─────────────────────────────────────── */
+.glass {
+  background: rgba(14, 17, 32, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(124, 110, 245, 0.12);
+}
+
+/* ── Gradient text utility ─────────────────────────────────────── */
+.text-gradient {
+  background: linear-gradient(135deg, #7c6ef5 0%, #5a6ef0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glow pulse animation ─────────────────────────────────────── */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(124,110,245,0.2); }
+  50%       { box-shadow: 0 0 20px rgba(124,110,245,0.5); }
+}
+
+.glow-pulse { animation: glowPulse 2.5s ease-in-out infinite; }
 
 /* ── Tailwind theme tokens ────────────────────────────────────── */
 @theme inline {
   --color-background: var(--bg-base);
   --color-foreground: var(--text-primary);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: 'Inter', var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 /* ── Utility overrides for dark-first ────────────────────────── */
-/* These map common slate light-mode utilities to dark equivalents */
 .bg-white          { background-color: var(--bg-surface) !important; }
 .bg-slate-50       { background-color: var(--bg-base)    !important; }
 .bg-slate-100      { background-color: var(--bg-surface) !important; }
@@ -139,9 +216,34 @@ p, li {
 .text-indigo-600   { color: var(--accent)                 !important; }
 .text-indigo-700   { color: var(--accent-hover)           !important; }
 
-/* Hover overrides */
 .hover\:bg-slate-50:hover  { background-color: var(--bg-raised)  !important; }
 .hover\:bg-slate-100:hover { background-color: var(--bg-raised)  !important; }
-
-/* Focused input ring on dark */
 .focus-visible\:ring-indigo-500:focus-visible { --tw-ring-color: var(--accent); }
+
+/* ── Input component base ─────────────────────────────────────── */
+.input-base {
+  width: 100%;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+.input-base:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+/* ── Smooth page transitions ──────────────────────────────────── */
+main > div {
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
