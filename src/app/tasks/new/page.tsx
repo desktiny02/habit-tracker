@@ -63,7 +63,7 @@ export default function NewTaskPage() {
         priority,
         required,
         repeatType: finalRepeatType,
-        time: time || undefined,
+        time: time || '',
         ...(finalRepeatType === 'weekly' ? { repeatDays } : {}),
         ...(finalRepeatType === 'once' ? { targetDate: finalTargetDate } : {}),
       });

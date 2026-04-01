@@ -38,7 +38,7 @@ export default function NewEventPage() {
         required: false, // dummy
         repeatType: 'once',
         targetDate,
-        time: time || undefined,
+        time: time || '',
       });
       toast.success('Event created!');
       router.push('/');
