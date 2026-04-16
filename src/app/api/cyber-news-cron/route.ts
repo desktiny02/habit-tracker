@@ -56,7 +56,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    // 2. Fetch Latest Cybersecurity News via Gemini 3 Flash Preview
+    // 2. Fetch Latest Cybersecurity News via Gemini 3.1 Flash Lite
     const prompt = `Act as a Cybersecurity and Tech Expert. SEARCH the internet for 5 to 10 significant news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
 
 Requirements:
@@ -75,7 +75,7 @@ STRICTLY FORBIDDEN: <h3>, <h4>, <ul>, <li>, <br/>, <p>, asterisk bullet points.
 Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stories with double newlines.`;
 
 
-    const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+    const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`;
     
     const aiRes = await fetch(aiUrl, {
       method: 'POST',
