@@ -57,13 +57,12 @@ export async function GET(req: Request) {
 
   try {
     // 2. Fetch Latest Cybersecurity News via Gemini 3.1 Flash Lite
-    const prompt = `Act as a Cybersecurity and Tech Expert. SEARCH the internet for 5 to 10 significant news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
+    const prompt = `Act as a Cybersecurity and Tech Expert. SEARCH the internet for 3 to 5 STRICTLY high-impact or critical news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
 
 Requirements:
-- Around 5 stories MUST be focused on Cybersecurity.
-- The remaining stories MUST be major news in the IT/Tech world.
-- Each story MUST have a criticality status indicator in front of the headline: 🔴 (Red), 🟠 (Orange), or 🟡 (Yellow).
-- SORT the entire list strictly by criticality: all 🔴 Red first, then 🟠 Orange, then 🟡 Yellow.
+- News MUST be focused on critical Cybersecurity threats or major IT/Tech world breakthroughs.
+- Each story MUST have a criticality status indicator: 🔴 (Red) for Critical, 🟠 (Orange) for High. Only include 🟡 (Yellow) if it is exceptionally relevant.
+- SORT the list strictly by criticality: all 🔴 Red first, then 🟠 Orange.
 
 For EACH story, provide:
 - The status indicator emoji followed by a bold headline that is hyperlinked to the original source URL. Use the exact format: <a href="URL"><b>Headline</b></a>
