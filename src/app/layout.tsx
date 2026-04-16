@@ -15,8 +15,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Habit Tracker — Build Better Habits',
-  description: 'Track your daily habits, earn points, and redeem rewards.',
+  title: 'HabitOS — Master Your Consistency',
+  description: 'A world-class productivity system to track habits, earn points, and build a consistent life.',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({

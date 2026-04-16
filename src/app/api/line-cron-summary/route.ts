@@ -9,7 +9,11 @@ async function pushTelegramMessage(to: string, text: string) {
   return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: to, text }),
+    body: JSON.stringify({ 
+      chat_id: to, 
+      text,
+      parse_mode: 'HTML'
+    }),
   });
 }
 
@@ -77,9 +81,9 @@ export async function GET(req: Request) {
   const isManualTrigger = (manualKey === 'HabitAppCronTest'); // Secret fallback for testing
   
   // If CRON_SECRET is NOT set in Vercel, we allow it for now but warn (fixes the user's issue)
-  const isAllowedToRun = isVercelCron || isManualTrigger || !cronSecret;
+  const isAllowedToRun = isVercelCron || isManualTrigger || (process.env.NODE_ENV !== 'production') || !cronSecret;
 
-  if (process.env.NODE_ENV === 'production' && !isAllowedToRun) {
+  if (!isAllowedToRun) {
     console.error('[LINE Cron] Attempted access denied (Unauthorized).');
     return new Response('Unauthorized - Access denied.', { status: 401 });
   }

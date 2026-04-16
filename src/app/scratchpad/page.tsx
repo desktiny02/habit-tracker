@@ -4,10 +4,10 @@ import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/lib/firebase/auth';
 import { db } from '@/lib/firebase/config';
 import { createTask } from '@/lib/firebase/firestore';
-import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { Trash2, Bold, Italic, Underline, List, Clock, Save, StickyNote } from 'lucide-react';
+import { Trash2, Bold, Italic, Underline, List, Clock, Save, StickyNote, Copy, RefreshCcw, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ScratchNote {
@@ -17,11 +17,16 @@ interface ScratchNote {
   createdAt: number;
   expiresAt: number | null;
   linkedEventDate?: string;
+  isDeleted?: boolean;
+  deletedAt?: number | null;
 }
 
 export default function ScratchpadPage() {
   const { user, loading } = useAuth();
   const [notes, setNotes] = useState<ScratchNote[]>([]);
+  const [deletedNotes, setDeletedNotes] = useState<ScratchNote[]>([]);
+  const [selectedNote, setSelectedNote] = useState<ScratchNote | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const [expiration, setExpiration] = useState('1-week');
@@ -40,7 +45,8 @@ export default function ScratchpadPage() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const now = Date.now();
-      const fetchedNotes: ScratchNote[] = [];
+      const fetchedActive: ScratchNote[] = [];
+      const fetchedDeleted: ScratchNote[] = [];
 
       snapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data();
@@ -51,17 +57,31 @@ export default function ScratchpadPage() {
           createdAt: data.createdAt,
           expiresAt: data.expiresAt || null,
           linkedEventDate: data.linkedEventDate,
+          isDeleted: data.isDeleted || false,
+          deletedAt: data.deletedAt || null,
         };
 
-        if (note.expiresAt !== null && note.expiresAt < now) {
-          deleteDoc(doc(db, 'tasks', note.id)).catch(console.error);
+        if (note.isDeleted && note.deletedAt) {
+          const daysDeleted = (now - note.deletedAt) / (1000 * 60 * 60 * 24);
+          if (daysDeleted > 7) {
+            deleteDoc(doc(db, 'tasks', note.id)).catch(console.error);
+          } else {
+            fetchedDeleted.push(note);
+          }
+        } else if (note.expiresAt !== null && note.expiresAt < now) {
+          updateDoc(doc(db, 'tasks', note.id), {
+            isDeleted: true,
+            deletedAt: now
+          }).catch(console.error);
         } else {
-          fetchedNotes.push(note);
+          fetchedActive.push(note);
         }
       });
 
-      fetchedNotes.sort((a, b) => b.createdAt - a.createdAt);
-      setNotes(fetchedNotes);
+      fetchedActive.sort((a, b) => b.createdAt - a.createdAt);
+      fetchedDeleted.sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+      setNotes(fetchedActive);
+      setDeletedNotes(fetchedDeleted);
     });
 
     return () => unsubscribe();
@@ -145,13 +165,55 @@ export default function ScratchpadPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, permanent = false) => {
     try {
-      await deleteDoc(doc(db, 'tasks', id));
-      toast.success('Note removed');
+      if (permanent) {
+        await deleteDoc(doc(db, 'tasks', id));
+        toast.success('Note permanently removed');
+      } else {
+        await updateDoc(doc(db, 'tasks', id), {
+          isDeleted: true,
+          deletedAt: Date.now()
+        });
+        toast.success('Note moved to deleted');
+      }
     } catch (error) {
       toast.error('Failed to remove note');
     }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'tasks', id), {
+        isDeleted: false,
+        deletedAt: null,
+        expiresAt: null
+      });
+      toast.success('Note restored');
+    } catch (error) {
+      toast.error('Failed to restore note');
+    }
+  };
+
+  const handleCopy = (htmlContent: string) => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const text = tempDiv.textContent || tempDiv.innerText || '';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      toast.success('Copied to clipboard');
+    }
+  };
+
+  const truncateHtml = (htmlContent: string) => {
+    if (typeof window === 'undefined') return { content: '', isLong: false };
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    if (plainText.length > 250) {
+      return { content: plainText.substring(0, 250) + '...', isLong: true };
+    }
+    return { content: htmlContent, isLong: false };
   };
 
   if (loading || !user) {
@@ -250,29 +312,127 @@ export default function ScratchpadPage() {
              </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {notes.map((note) => (
-                <div key={note.id} className="rounded-2xl p-4 border relative group overflow-hidden" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-strong)' }}>
-                  <div className="absolute top-0 right-0 w-8 h-8 rounded-bl-xl bg-black/10 z-0"></div>
-                  <div className="relative z-10 flex flex-col h-full">
-                    <div className="prose prose-sm prose-invert mb-4 flex-1 text-sm break-words content-renderer" style={{ color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: note.content }} />
-                    <div className="flex items-center justify-between pt-3 border-t mt-auto" style={{ borderColor: 'var(--border)' }}>
-                      <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Created: {format(note.createdAt, 'MMM d, h:mm a')}
-                        <br/>
-                        {note.linkedEventDate ? (
-                           <span className="text-sky-400 font-semibold text-[11px]">Event on {format(new Date(note.linkedEventDate), 'MMM d, yyyy')}</span>
+              {notes.map((note) => {
+                const { content: displayContent, isLong } = truncateHtml(note.content);
+                return (
+                  <div key={note.id} className="rounded-2xl p-4 border relative group overflow-hidden flex flex-col h-[280px]" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-strong)' }}>
+                    <div className="absolute top-0 right-0 w-8 h-8 rounded-bl-xl bg-black/10 z-0"></div>
+                    <div className="relative z-10 flex flex-col h-full">
+                      <div className="flex-1 overflow-hidden relative">
+                        {isLong ? (
+                          <div className="prose prose-sm prose-invert text-sm break-words whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+                            {displayContent}
+                          </div>
                         ) : (
-                           note.expiresAt ? `Expires: ${format(note.expiresAt, 'MMM d, yyyy')}` : 'Kept Forever'
+                          <div className="prose prose-sm prose-invert text-sm break-words content-renderer" style={{ color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: displayContent }} />
+                        )}
+                        {isLong && (
+                          <button onClick={() => setSelectedNote(note)} className="mt-2 text-sm font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
+                            Load more
+                          </button>
                         )}
                       </div>
-                      <button onClick={() => handleDelete(note.id)} className="p-2 rounded-xl text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>
+                      
+                      <div className="flex items-center justify-between pt-3 border-t mt-3 shrink-0" style={{ borderColor: 'var(--border)' }}>
+                        <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                          Created: {format(note.createdAt, 'MMM d, h:mm a')}
+                          <br/>
+                          {note.linkedEventDate ? (
+                             <span className="text-sky-400 font-semibold text-[11px]">Event on {format(new Date(note.linkedEventDate), 'MMM d, yyyy')}</span>
+                          ) : (
+                             note.expiresAt ? `Expires: ${format(note.expiresAt, 'MMM d, yyyy')}` : 'Kept Forever'
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleCopy(note.content)} className="p-2 rounded-xl hover:bg-black/10 transition-colors" style={{ color: 'var(--text-primary)' }} title="Copy">
+                            <Copy size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(note.id)} className="p-2 rounded-xl text-red-400 hover:bg-red-400/10 transition-colors" title="Remove">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* Deleted Notes Section */}
+        {deletedNotes.length > 0 && (
+          <div className="mt-12 border-t pt-8" style={{ borderColor: 'var(--border)' }}>
+            <button 
+              onClick={() => setShowDeleted(!showDeleted)}
+              className="flex items-center gap-2 text-sm font-medium mb-4 transition-colors hover:text-white" style={{ color: 'var(--text-secondary)' }}
+            >
+              {showDeleted ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              Recently Deleted ({deletedNotes.length})
+            </button>
+            
+            {showDeleted && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {deletedNotes.map((note) => {
+                  const { content: displayContent, isLong } = truncateHtml(note.content);
+                  return (
+                    <div key={note.id} className="rounded-2xl p-4 border relative flex flex-col h-[280px]" style={{ backgroundColor: 'var(--bg-raised)', borderColor: 'var(--border-strong)' }}>
+                      <div className="relative z-10 flex flex-col h-full opacity-60 hover:opacity-100 transition-opacity">
+                        <div className="flex-1 overflow-hidden relative">
+                          {isLong ? (
+                            <div className="prose prose-sm prose-invert text-sm break-words whitespace-pre-wrap line-through" style={{ color: 'var(--text-muted)' }}>
+                              {displayContent}
+                            </div>
+                          ) : (
+                            <div className="prose prose-sm prose-invert text-sm break-words content-renderer opacity-70" dangerouslySetInnerHTML={{ __html: displayContent }} />
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between pt-3 border-t mt-3 shrink-0" style={{ borderColor: 'var(--border)' }}>
+                          <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                            Deleted: {note.deletedAt ? format(note.deletedAt, 'MMM d') : 'Unknown'}
+                            <br/>
+                            <span>Will be removed in {7 - Math.floor((Date.now() - (note.deletedAt || Date.now())) / (1000 * 60 * 60 * 24))} days</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <button onClick={() => handleRestore(note.id)} className="p-2 rounded-xl text-green-400 hover:bg-green-400/10 transition-colors" title="Restore Note"><RefreshCcw size={16} /></button>
+                             <button onClick={() => handleDelete(note.id, true)} className="p-2 rounded-xl text-red-500 hover:bg-red-500/10 transition-colors" title="Delete Permanently"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal for full note */}
+        {selectedNote && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedNote(null)}>
+            <div 
+              className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl border shadow-2xl" 
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+                <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Full Note</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleCopy(selectedNote.content)} className="p-2 rounded-xl hover:bg-black/10 transition-colors" style={{ color: 'var(--text-primary)' }} title="Copy">
+                    <Copy size={18} />
+                  </button>
+                  <button onClick={() => setSelectedNote(null)} className="p-2 rounded-xl hover:bg-black/10 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1 bg-black/20 rounded-b-2xl">
+                <div className="prose prose-sm prose-invert text-base break-words content-renderer" style={{ color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: selectedNote.content }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <style dangerouslySetInnerHTML={{__html: `

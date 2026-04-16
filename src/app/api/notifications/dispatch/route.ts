@@ -10,7 +10,11 @@ async function sendTelegramMessage(chatId: string, text: string) {
   return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify({ 
+      chat_id: chatId, 
+      text,
+      parse_mode: 'HTML'
+    }),
   });
 }
 
@@ -40,7 +44,7 @@ export async function GET(req: Request) {
       if (userData?.telegramChatId) {
         try {
           const label = notif.itemType === 'event' ? 'Event' : 'Task';
-          const message = `🔔 ${label} Reminder\n${notif.taskName}\n🕒 ${notif.scheduledTime}${notif.description ? `\n\n${notif.description}` : ''}`;
+          const message = `🔔 <b>${label} Reminder</b>\n\n📌 <b>Task:</b> ${notif.taskName}\n🕒 <b>Time:</b> ${notif.scheduledTime}${notif.description ? `\n\n💬 <i>${notif.description}</i>` : ''}`;
           
           const res = await sendTelegramMessage(userData.telegramChatId, message);
           const status = res?.ok ? 'sent' : 'failed';

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/firebase/admin';
 import { format } from 'date-fns';
+import { extractGeminiText } from '@/lib/utils';
+
 
 async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: any) {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -8,7 +10,7 @@ async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: a
     console.error('[Telegram Webhook] CRITICAL: TELEGRAM_BOT_TOKEN is missing in Vercel env!');
     return;
   }
-  return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -18,7 +20,25 @@ async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: a
       reply_markup: replyMarkup
     }),
   });
+  
+  if (!res.ok) {
+    const errorData = await res.json();
+    console.error(`[Telegram Webhook] Send Failed:`, errorData);
+    if (errorData.description?.includes('can\'t parse entities')) {
+      return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: text.replace(/<[^>]*>?/gm, ''), // Strip tags for safety
+          reply_markup: replyMarkup
+        }),
+      });
+    }
+  }
+  return res;
 }
+
 
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -49,7 +69,7 @@ export async function POST(req: Request) {
         const userSnap = await dbAdmin.collection('users').where('telegramChatId', '==', String(chatId)).get();
         
         if (userSnap.empty) {
-          await answerCallbackQuery(cb.id, "Account not linked!");
+          await answerCallbackQuery(cb.id, "⚠️ Account not linked yet!");
           return NextResponse.json({ success: true });
         }
 
@@ -58,7 +78,7 @@ export async function POST(req: Request) {
         const taskSnap = await dbAdmin.collection('tasks').doc(taskId).get();
         const task = taskSnap.data();
         if (!taskSnap.exists || !task) {
-          await answerCallbackQuery(cb.id, "Task not found!");
+          await answerCallbackQuery(cb.id, "⚠️ Task not found!");
           return NextResponse.json({ success: true });
         }
 
@@ -68,7 +88,7 @@ export async function POST(req: Request) {
         const logSnap = await logRef.get();
 
         if (logSnap.exists) {
-          await answerCallbackQuery(cb.id, "Already completed today!");
+          await answerCallbackQuery(cb.id, "✅ Already completed today!");
         } else {
           // Calculate points (Simplified replication of logDailyTask)
           let pointsAwarded = 0;
@@ -98,8 +118,8 @@ export async function POST(req: Request) {
             });
           });
 
-          await answerCallbackQuery(cb.id, `✅ "${task.name}" completed! +${pointsAwarded} pts`);
-          await sendTelegramMessage(chatId, `🎉 <b>Great job!</b> You completed <b>${task.name}</b> and earned <b>${pointsAwarded}</b> points!`);
+          await answerCallbackQuery(cb.id, `✅ "${task.name}" completed! (+${pointsAwarded} pts)`);
+          await sendTelegramMessage(chatId, `🎉 <b>Great Job!</b>\n\n✅ <s>${task.name}</s> completed\n⭐ <b>+${pointsAwarded} Points</b> earned!`);
         }
       }
       return NextResponse.json({ success: true });
@@ -113,7 +133,7 @@ export async function POST(req: Request) {
 
       // Check for Start
       if (text.startsWith('/start')) {
-        await sendTelegramMessage(chatId, "👋 <b>Welcome!</b> I can help you track your habits directly from Telegram.\n\nCommands:\n/tasks - See today's tasks\n/link [PIN] - Link your account");
+        await sendTelegramMessage(chatId, "👋 <b>Welcome to HabitOS!</b>\n\nI am your personal productivity assistant, ready to track your habits and daily goals out of your dashboard.\n\n<b>Commands:</b>\n📦 <code>/tasks</code> - View your pending tasks for today\n🔗 <code>/link [PIN]</code> - Link your Telegram account\n\n<i>Tip: Just type your task directly to me, and I'll use AI to schedule it for you!</i>");
         return NextResponse.json({ success: true });
       }
 
@@ -123,9 +143,9 @@ export async function POST(req: Request) {
         const snap = await dbAdmin.collection('users').where('linePin', '==', pin).get();
         if (!snap.empty) {
           await snap.docs[0].ref.update({ telegramChatId: String(chatId) });
-          await sendTelegramMessage(chatId, "✅ <b>Success!</b> Your Telegram is now linked.");
+          await sendTelegramMessage(chatId, "✅ <b>Account Linked Successfully!</b>\n\nYou are securely connected. Send <code>/tasks</code> to get started.");
         } else {
-          await sendTelegramMessage(chatId, "❌ <b>Invalid PIN.</b> Check your dashboard card for the code!");
+          await sendTelegramMessage(chatId, "❌ <b>Invalid PIN</b>\n\nPlease check your dashboard setup card for the correct security code.");
         }
         return NextResponse.json({ success: true });
       }
@@ -134,7 +154,7 @@ export async function POST(req: Request) {
       if (text.startsWith('/tasks')) {
         const userSnap = await dbAdmin.collection('users').where('telegramChatId', '==', String(chatId)).get();
         if (userSnap.empty) {
-          await sendTelegramMessage(chatId, "⚠️ <b>Not Linked.</b> Please use <code>/link PIN</code> first.");
+          await sendTelegramMessage(chatId, "⚠️ <b>Account Not Linked</b>\n\nPlease link your account first using the <code>/link [PIN]</code> command.");
           return NextResponse.json({ success: true });
         }
         
@@ -163,14 +183,14 @@ export async function POST(req: Request) {
         }
 
         if (pending.length === 0) {
-          await sendTelegramMessage(chatId, "🙌 <b>All done!</b> No pending tasks for today.");
+          await sendTelegramMessage(chatId, "🙌 <b>You're all caught up!</b>\n\nThere are no pending tasks left for today. Enjoy the rest of your day!");
         } else {
           const buttons = pending.map(p => ([{
             text: `✅ ${p.name}`,
             callback_data: `done:${p.id}`
           }]));
 
-          await sendTelegramMessage(chatId, "📝 <b>Today's Pending Items:</b>\nClick a button to mark as completed!", {
+          await sendTelegramMessage(chatId, "📋 <b>Today's Pending Tasks</b>\n\n<i>Tap a task below to mark it as complete and earn your points!</i>", {
             inline_keyboard: buttons
           });
         }
@@ -185,7 +205,7 @@ export async function POST(req: Request) {
           const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
           
           if (!GEMINI_API_KEY) {
-            await sendTelegramMessage(chatId, "⚠️ <b>Error:</b> GEMINI_API_KEY is missing in the server! Natural entries are locked.");
+            await sendTelegramMessage(chatId, "⚠️ <b>Service Unavailable</b>\n\nThe AI ecosystem configuration is missing. Natural entries are currently disabled.");
             return NextResponse.json({ success: true });
           }
 
@@ -206,8 +226,8 @@ Schema:
   "targetDate": "YYYY-MM-DD" (only if once)
 }`;
           
-          // Using Gemini 2.5 Flash (Stable)
-          const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+          // Using Gemini 3 Flash Preview
+          const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
           
           const aiRes = await fetch(aiUrl, {
             method: 'POST',
@@ -225,22 +245,18 @@ Schema:
           const resJson = await aiRes.json();
           
           if (resJson.error) {
-              await sendTelegramMessage(chatId, `⚠️ <b>Gemini 3 Error:</b> ${resJson.error.message}\n<code>Status: ${resJson.error.status}</code>`);
+              await sendTelegramMessage(chatId, `⚠️ <b>AI Processing Error</b>\n\n<i>${resJson.error.message}</i>`);
               return NextResponse.json({ success: true });
           }
 
-          if (!resJson.candidates || resJson.candidates.length === 0) {
-              const debugResp = JSON.stringify(resJson).substring(0, 500);
-              await sendTelegramMessage(chatId, `⚠️ <b>AI Error:</b> Empty response received.\n\nDebug: <code>${debugResp}</code>`);
-              return NextResponse.json({ success: true });
-          }
-
-          const textContent = resJson.candidates[0].content?.parts?.[0]?.text;
+          const textContent = extractGeminiText(resJson);
           
           if (!textContent) {
-              await sendTelegramMessage(chatId, "⚠️ <b>AI Error:</b> Response had no content.");
+              const debugResp = JSON.stringify(resJson.candidates).substring(0, 300);
+              await sendTelegramMessage(chatId, `⚠️ <b>Extraction Failed</b>\n\nUnable to extract precise task details from your message.`);
               return NextResponse.json({ success: true });
           }
+
           
           const config = JSON.parse(textContent.trim());
 
@@ -253,13 +269,13 @@ Schema:
             userId: userDoc.id,
             createdAt: Date.now()
           });
-          await sendTelegramMessage(chatId, `✅ <b>Added:</b> "${config.name}" to your list!`);
+          await sendTelegramMessage(chatId, `✨ <b>Task Automatically Scheduled</b>\n\n📌 <b>Task:</b> ${config.name}\n\n<i>Your daily queue has been updated.</i>`);
         } else {
-           await sendTelegramMessage(chatId, "⚠️ <b>Account not linked!</b> Please type <code>/link PIN</code> first.");
+           await sendTelegramMessage(chatId, "⚠️ <b>Account Not Linked</b>\n\nPlease securely link your account using <code>/link [PIN]</code> before sending natural language tasks.");
         }
       } catch (e: any) {
         console.error('[Telegram AI Parsing Error]:', e);
-        await sendTelegramMessage(chatId, `⚠️ <b>AI Parse Error:</b> ${e.message}\nPlease try using a simpler format.`);
+        await sendTelegramMessage(chatId, `⚠️ <b>Extraction Disrupted</b>\n\nCould not process your request accurately. Please try rephrasing your task.\n\n<i>Error Context: ${e.message}</i>`);
       }
     }
 

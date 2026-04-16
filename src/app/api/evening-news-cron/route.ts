@@ -3,7 +3,6 @@ import { dbAdmin } from '@/lib/firebase/admin';
 import { format } from 'date-fns';
 import { extractGeminiText } from '@/lib/utils';
 
-
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
@@ -37,7 +36,6 @@ async function sendTelegramMessage(chatId: string, text: string) {
   return res;
 }
 
-
 export async function GET(req: Request) {
   // 1. Verify Authorization
   const { searchParams } = new URL(req.url);
@@ -47,22 +45,21 @@ export async function GET(req: Request) {
 
   const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
   const isManualTrigger = (key === 'HabitAppCronTest');
-  // If CRON_SECRET is NOT set in Vercel, we allow it for now but warn (fixes the user's issue)
-  const isAllowedToRun = isVercelCron || isManualTrigger || !cronSecret || (process.env.NODE_ENV !== 'production');
+  const isAllowedToRun = isVercelCron || isManualTrigger || (process.env.NODE_ENV !== 'production') || !cronSecret;
 
   if (!isAllowedToRun) {
-    console.error('[LINE Cron] Attempted access denied (Unauthorized).');
-    return new Response('Unauthorized - Access denied.', { status: 401 });
+    return new Response('Unauthorized', { status: 401 });
   }
 
   try {
-    // 2. Fetch Latest Cybersecurity News via Gemini 3 Flash Preview
-    const prompt = `Act as a Cybersecurity and Tech Expert. SEARCH the internet for 5 to 10 significant news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
+    // 2. Fetch Evening Impactful News via Gemini 3 Flash
+    const prompt = `Act as an expert breaking news curator for a resident of Bangkok. SEARCH the internet for 5 to 10 highly impactful news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
 
 Requirements:
-- Around 5 stories MUST be focused on Cybersecurity.
-- The remaining stories MUST be major news in the IT/Tech world.
-- Each story MUST have a criticality status indicator in front of the headline: 🔴 (Red), 🟠 (Orange), or 🟡 (Yellow).
+- News MUST be highly impactful to Bangkok residents or Global citizens.
+- Focus on breaking news, major global events, economics, or significant local (Bangkok/Thailand) developments.
+- STRICTLY NO celebrity gossip, entertainment news, or irrelevant fluff.
+- Each story MUST have a criticality status indicator in front of the headline: 🔴 (Red) for Critical, 🟠 (Orange) for High, or 🟡 (Yellow) for Medium.
 - SORT the entire list strictly by criticality: all 🔴 Red first, then 🟠 Orange, then 🟡 Yellow.
 
 For EACH story, provide:
@@ -73,7 +70,6 @@ IMPORTANT: Do not just introduce the news. You MUST output actual stories found.
 ONLY USE THESE TAGS: <b>, <i>, <code>, <pre>, <a>. 
 STRICTLY FORBIDDEN: <h3>, <h4>, <ul>, <li>, <br/>, <p>, asterisk bullet points.
 Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stories with double newlines.`;
-
 
     const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
     
@@ -93,17 +89,17 @@ Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stor
     const resJson = await aiRes.json();
     
     if (resJson.error) {
-      console.error('[Cyber News] Gemini API Error:', resJson.error);
+      console.error('[Evening News] Gemini API Error:', resJson.error);
       return NextResponse.json({ error: resJson.error.message }, { status: 500 });
     }
 
     const newsContentRaw = extractGeminiText(resJson);
     if (!newsContentRaw) {
-      console.error('[Cyber News] No text generated. Candidates:', JSON.stringify(resJson.candidates));
+      console.error('[Evening News] No text generated. Candidates:', JSON.stringify(resJson.candidates));
       return NextResponse.json({ error: 'No news content generated' }, { status: 500 });
     }
 
-    // Sanitize common unallowed tags AI might output despite instructions
+    // Sanitize common unallowed tags
     const newsContent = newsContentRaw
       .replace(/<p>/g, '').replace(/<\/p>/g, '\n')
       .replace(/<h[1-6]>/g, '<b>').replace(/<\/h[1-6]>/g, '</b>\n')
@@ -111,21 +107,20 @@ Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stor
       .replace(/<ul>/g, '').replace(/<\/ul>/g, '')
       .replace(/<li>/g, '• ').replace(/<\/li>/g, '\n');
 
-
     // 3. Send to all linked Telegram users
     const usersSnap = await dbAdmin.collection('users').where('telegramChatId', '!=', '').get();
     const sendTasks = usersSnap.docs.map(async (doc) => {
       const userData = doc.data();
       if (userData.telegramChatId) {
-        return sendTelegramMessage(userData.telegramChatId, `📰 <b>Morning Tech & Cyber Digest</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${newsContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+        return sendTelegramMessage(userData.telegramChatId, `🌆 <b>Evening Impact Digest</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${newsContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
       }
     });
 
     await Promise.all(sendTasks);
 
-    return NextResponse.json({ success: true, message: 'Cybersecurity news sent to all users.' });
+    return NextResponse.json({ success: true, message: 'Evening news sent to all users.' });
   } catch (err: any) {
-    console.error('[Cyber News Cron Error]:', err);
+    console.error('[Evening News Cron Error]:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
