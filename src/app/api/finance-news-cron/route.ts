@@ -50,9 +50,9 @@ Focus specifically on:
 - Thai Stocks (SET Index major movers)
 - Cryptocurrency (BTC, ETH, and trending Altcoins)
 
-Objective: Identify the TOP 3 assets that are currently "trending" due to high volume, significant price action, or major breaking narratives.
+Objective: Identify the TOP 5 assets that are currently "trending" due to high volume, significant price action, or major breaking narratives.
 
-For EACH of the top 3 assets, provide:
+For EACH of the top 5 assets, provide:
 1. Asset Name & Ticker (Bold)
 2. Category (e.g., Crypto, Commodity, Tech Stock)
 3. Current Sentiment (Bullish/Bearish/Neutral)
