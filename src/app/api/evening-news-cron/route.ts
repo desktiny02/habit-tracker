@@ -44,7 +44,7 @@ export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
 
   const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (key === 'HabitAppCronTest');
+  const isManualTrigger = (key === 'HabitAppCronTest') || (cronSecret && key === cronSecret);
   const isAllowedToRun = isVercelCron || isManualTrigger || (process.env.NODE_ENV !== 'production') || !cronSecret;
 
   if (!isAllowedToRun) {

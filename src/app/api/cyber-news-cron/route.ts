@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
 
   const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (key === 'HabitAppCronTest');
+  const isManualTrigger = (key === 'HabitAppCronTest') || (cronSecret && key === cronSecret);
   // If CRON_SECRET is NOT set in Vercel, we allow it for now but warn (fixes the user's issue)
   const isAllowedToRun = isVercelCron || isManualTrigger || !cronSecret || (process.env.NODE_ENV !== 'production');
 
