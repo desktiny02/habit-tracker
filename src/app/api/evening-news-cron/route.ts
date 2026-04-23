@@ -7,69 +7,91 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 async function sendTelegramMessage(chatId: string, text: string) {
-  if (!TELEGRAM_BOT_TOKEN) return;
-  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML'
-    }),
-  });
+  if (!TELEGRAM_BOT_TOKEN) return { ok: false, error: 'No Token' };
+
+  // Split text into chunks of max 4000 characters
+  const maxChars = 4000;
+  const chunks: string[] = [];
   
-  if (!res.ok) {
-    const errorData = await res.json();
-    console.error(`[Telegram] Send Message Failed:`, errorData);
-    if (errorData.description?.includes('can\'t parse entities')) {
-      // Fallback: Send without HTML if parser dies
-      return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  if (text.length <= maxChars) {
+    chunks.push(text);
+  } else {
+    let remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxChars) {
+        chunks.push(remaining);
+        break;
+      }
+      let splitIndex = remaining.lastIndexOf('\n\n', maxChars);
+      if (splitIndex === -1) splitIndex = maxChars;
+      chunks.push(remaining.substring(0, splitIndex));
+      remaining = remaining.substring(splitIndex).trim();
+    }
+  }
+
+  let finalRes: { ok: boolean; error?: any } = { ok: true };
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkPrefix = chunks.length > 1 ? `[Part ${i+1}/${chunks.length}]\n` : '';
+    const chunkText = chunkPrefix + chunks[i];
+
+    let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: chunkText,
+        parse_mode: 'HTML'
+      }),
+    });
+
+    if (!res.ok) {
+      const plainText = chunkText.replace(/<[^>]*>?/gm, ''); 
+      res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId,
-          text: text.replace(/<[^>]*>?/gm, ''), // Strip tags for safety
+          text: plainText
         }),
       });
     }
+
+    if (!res.ok) {
+      const err = await res.json();
+      finalRes = { ok: false, error: err };
+    }
   }
-  return res;
+
+  return finalRes;
 }
 
-export async function GET(req: Request) {
-  // 1. Verify Authorization
-  const { searchParams } = new URL(req.url);
-  const key = searchParams.get('key');
-  const authHeader = req.headers.get('Authorization');
-  const cronSecret = process.env.CRON_SECRET;
+import { validateCronAuth } from '@/lib/cron-auth';
 
-  const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (key === 'HabitAppCronTest') || (cronSecret && key === cronSecret);
-  const isAllowedToRun = isVercelCron || isManualTrigger || (process.env.NODE_ENV !== 'production') || !cronSecret;
+export async function POST(req: Request) {
+  // Verify Authorization and Method
+  const authError = await validateCronAuth(req);
+  if (authError) return authError;
 
-  if (!isAllowedToRun) {
-    return new Response('Unauthorized', { status: 401 });
-  }
 
   try {
-    // 2. Fetch Evening Impactful News via Gemini 3.1 Flash Lite
-    const prompt = `Act as an expert breaking news curator for a resident of Bangkok. SEARCH the internet for 3 to 5 STRICTLY high-impact or critical news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
+    // 2. Fetch Evening Impactful News via Gemini 2.0 Flash (Expert Intelligence Educator)
+    const prompt = `Act as an expert curator and systems thinker. You are teaching a masterclass on global events.
+    
+SEARCH the internet for the most BREAKING, high-impact world events from the last 12-24 hours. Today is ${format(new Date(), 'eeee, MMMM do, yyyy')}.
 
 Requirements:
-- News MUST be extremely impactful to Bangkok residents or Global citizens.
-- Focus ONLY on major breaking news, major global events, or significant local developments.
-- STRICTLY NO celebrity gossip, light entertainment, or low-impact news.
-- Each story MUST have a criticality status indicator: 🔴 (Red) for Critical, 🟠 (Orange) for High. Only include 🟡 (Yellow) if it is exceptionally relevant.
-- SORT the list strictly by criticality: all 🔴 Red first, then 🟠 Orange.
+- News MUST be extremely high-impact (Geopolitics, Macro-Economics, or Major Tech shifts).
+- Focus ONLY on critical events from TODAY.
+- NO simple headline reporting. Explain the second-order impacts on global systems.
 
-For EACH story, provide:
-- The status indicator emoji followed by a bold headline that is hyperlinked to the original source URL. Use the exact format: <a href="URL"><b>Headline</b></a>
-- A concise summary (1-2 sentences)
+For EACH story:
+1. 🔴/🟠 <b>Headline (Hyperlinked Source)</b>: <a href="URL"><b>Headline</b></a>
+2. <b>Systems Analysis:</b> Explain the expert-level "Why this matters". Connect individual events to broader global trends (e.g. how a regional conflict impacts global energy routing or sovereign debt).
+3. <code>[Expert Learning Nugget]</code>: Teach an advanced concept related to this event (e.g. the mechanics of a specific trade treaty, a geopolitical concept like 'String of Pearls', or a rare economic indicator).
 
-IMPORTANT: Do not just introduce the news. You MUST output actual stories found. 
-ONLY USE THESE TAGS: <b>, <i>, <code>, <pre>, <a>. 
-STRICTLY FORBIDDEN: <h3>, <h4>, <ul>, <li>, <br/>, <p>, asterisk bullet points.
-Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stories with double newlines.`;
+IMPORTANT: Do not use your 2024 training data. Use ONLY live search results from today. Speak to me as an advanced student—no basics.
+ONLY USE THESE TAGS: <b>, <i>, <code>, <pre>, <a>.`;
 
     const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`;
     
@@ -80,9 +102,7 @@ Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stor
         contents: [{
           parts: [{ text: prompt }]
         }],
-        tools: [{
-          google_search: {} // Enable Google Search grounding
-        }]
+        tools: [{ google_search: {} }]
       })
     });
 
@@ -107,18 +127,39 @@ Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stor
       .replace(/<ul>/g, '').replace(/<\/ul>/g, '')
       .replace(/<li>/g, '• ').replace(/<\/li>/g, '\n');
 
-    // 3. Send to all linked Telegram users
+    // 3. Broadcast to Users
     const usersSnap = await dbAdmin.collection('users').where('telegramChatId', '!=', '').get();
-    const sendTasks = usersSnap.docs.map(async (doc) => {
+    let sentCount = 0;
+    let lastError: any = null;
+
+    for (const doc of usersSnap.docs) {
       const userData = doc.data();
-      if (userData.telegramChatId) {
-        return sendTelegramMessage(userData.telegramChatId, `🌆 <b>Evening Impact Digest</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${newsContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+      const chatId = userData.telegramChatId;
+      if (chatId) {
+        try {
+          const result = await sendTelegramMessage(chatId, `🌆 <b>Evening Impact Digest</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${newsContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+          if (result.ok) {
+            sentCount++;
+          } else {
+            lastError = result.error;
+          }
+        } catch (e: any) {
+          lastError = e.message;
+        }
+      }
+    }
+
+    return NextResponse.json({ 
+      success: sentCount > 0, 
+      processedUsers: usersSnap.docs.length,
+      sentCount,
+      lastError,
+      envCheck: {
+        hasToken: !!TELEGRAM_BOT_TOKEN,
+        tokenLength: TELEGRAM_BOT_TOKEN.length,
+        tokenPrefix: TELEGRAM_BOT_TOKEN.substring(0, 5)
       }
     });
-
-    await Promise.all(sendTasks);
-
-    return NextResponse.json({ success: true, message: 'Evening news sent to all users.' });
   } catch (err: any) {
     console.error('[Evening News Cron Error]:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

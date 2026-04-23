@@ -7,66 +7,104 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 async function sendTelegramMessage(chatId: string, text: string) {
-  if (!TELEGRAM_BOT_TOKEN) return;
-  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML'
-    }),
-  });
+  if (!TELEGRAM_BOT_TOKEN) return { ok: false, error: 'No Token' };
+
+  // Split text into chunks of max 4000 characters
+  // We try to split by double newlines first to keep stories together
+  const maxChars = 4000;
+  const chunks: string[] = [];
   
-  if (!res.ok) {
-    const errorData = await res.json();
-    console.error(`[Finance News] Telegram Send Failed:`, errorData);
+  if (text.length <= maxChars) {
+    chunks.push(text);
+  } else {
+    let remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxChars) {
+        chunks.push(remaining);
+        break;
+      }
+      
+      // Look for a nearby double newline to split cleanly
+      let splitIndex = remaining.lastIndexOf('\n\n', maxChars);
+      if (splitIndex === -1) splitIndex = maxChars; // Force split if no gap found
+      
+      chunks.push(remaining.substring(0, splitIndex));
+      remaining = remaining.substring(splitIndex).trim();
+    }
   }
-  return res;
+
+  let finalRes: { ok: boolean; error?: any } = { ok: true };
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkPrefix = chunks.length > 1 ? `[Part ${i+1}/${chunks.length}]\n` : '';
+    const chunkText = chunkPrefix + chunks[i];
+
+    // Try 1: HTML
+    let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: chunkText,
+        parse_mode: 'HTML'
+      }),
+    });
+
+    if (!res.ok) {
+      // Try 2: Plain Text Fallback for this chunk
+      const plainText = chunkText.replace(/<[^>]*>?/gm, ''); 
+      res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: plainText
+        }),
+      });
+    }
+
+    if (!res.ok) {
+      const err = await res.json();
+      finalRes = { ok: false, error: err };
+    }
+  }
+
+  return finalRes;
 }
 
-export async function GET(req: Request) {
-  // 1. Verify Authorization
-  const { searchParams } = new URL(req.url);
-  const key = searchParams.get('key');
-  const authHeader = req.headers.get('Authorization');
-  const cronSecret = process.env.CRON_SECRET;
+import { validateCronAuth } from '@/lib/cron-auth';
 
-  const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (key === 'HabitAppCronTest') || (cronSecret && key === cronSecret);
-  const isAllowedToRun = isVercelCron || isManualTrigger || (process.env.NODE_ENV !== 'production') || !cronSecret;
+export async function POST(req: Request) {
+  // Verify Authorization and Method
+  const authError = await validateCronAuth(req);
+  if (authError) return authError;
 
-  if (!isAllowedToRun) {
-    return new Response('Unauthorized', { status: 401 });
-  }
 
   try {
-    // 2. Analyze Financial Markets via Gemini 3.1 Flash Lite
-    const prompt = `Act as an expert Global Macro and Crypto Analyst. SEARCH the internet for the most significant financial news from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
+    // 2. Analyze Financial Markets via Gemini 2.0 Flash (Expert Intelligence Educator)
+    const prompt = `Act as a Senior Macro Strategist and Hedge Fund Alpha Researcher. You are teaching a masterclass to elite students.
     
-Focus specifically on:
-- Commodities (Gold, Oil, Gas)
-- Global Stocks (US Market, etc.)
-- Thai Stocks (SET Index major movers)
-- Cryptocurrency (BTC, ETH, and trending Altcoins)
+SEARCH the internet for the most BREAKING, high-impact alpha events from the last 12-24 hours. Today is ${format(new Date(), 'eeee, MMMM do, yyyy')}.
 
-Objective: Identify the TOP 5 assets that are currently "trending" due to high volume, significant price action, or major breaking narratives.
+Focus on:
+- Global Macro shifts (Rates, Yield curves, Central Bank signals)
+- Commodities (Geopolitical risk premiums, supply-chain bottlenecks)
+- Advanced Crypto (On-chain signals, L2 scaling breakthroughs, Protocol upgrades)
+- Regional Alpha (Specific SET Index movers with global correlation)
 
-For EACH of the top 5 assets, provide:
-1. Asset Name & Ticker (Bold)
-2. Category (e.g., Crypto, Commodity, Tech Stock)
-3. Current Sentiment (Bullish/Bearish/Neutral)
-4. The "Why": A concise 2-sentence explanation of the "alpha" - why it is interesting or popular today.
-5. Source/Narrative: One sentence on whether this is driven by hype, institutional news, or macro shifts (e.g., Fed rumors).
+Requirements for each of the TOP 5 assets:
+1. <b>Asset Name (TICKER)</b>
+2. <b>The Narrative:</b> Explain the expert-level "Why". Do not explain fundamentals (e.g. don't explain what an ETF is). Instead, explain the second-order effects (e.g. how the ETF flow is impacting liquidity depth or arbitrage spreads).
+3. <b>Expert Insight:</b> A deep technical takeaway. Teach something new—mechanics of a specific trade, a rare chart pattern appearing, or a complex macro correlation.
 
-Tone: Professional, objective, alpha-focused. No generic advice.
+CRITICAL: Use LIVE search data only. Explain like a mentor to an advanced student. No fluff.
 
 Formatting for Telegram HTML:
-- Use <b>Asset Name (TICKER)</b> for the header.
-- Use <i>Italic</i> for the 'Why' section.
-- Use <code>Code</code> tags for the Category/Sentiment labels.
-- Separate each asset with a double newline and a divider.
-- NO markdown bullet points. Use newline separation only.`;
+- Header: <code>[Expert Analysis]</code>
+- Asset: <b>Asset Name (TICKER)</b>
+- Divider: ━━━━━━━━━━━━━━━━━━━━━━
+- Insight Section: <code>[Technical Learning Nugget]</code>
+- No markdown bullets. Use newline separation only.`;
 
     const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`;
     
@@ -78,7 +116,7 @@ Formatting for Telegram HTML:
           parts: [{ text: prompt }]
         }],
         tools: [{
-          google_search: {} // Enable Google Search grounding
+          google_search: {} 
         }]
       })
     });
@@ -101,20 +139,44 @@ Formatting for Telegram HTML:
       .replace(/<h[1-6]>/g, '<b>').replace(/<\/h[1-6]>/g, '</b>\n')
       .replace(/<br\s*\/?>/g, '\n')
       .replace(/<ul>/g, '').replace(/<\/ul>/g, '')
-      .replace(/<li>/g, '• ').replace(/<\/li>/g, '\n');
+      .replace(/<li>/g, '• ').replace(/<\/li>/g, '\n')
+      .replace(/<div[^>]*>/g, '').replace(/<\/div>/g, '\n')
+      .replace(/<span[^>]*>/g, '').replace(/<\/span>/g, '')
+      .replace(/&nbsp;/g, ' ');
 
-    // 3. Send to all linked Telegram users
+    // 3. Broadcast to Users
     const usersSnap = await dbAdmin.collection('users').where('telegramChatId', '!=', '').get();
-    const sendTasks = usersSnap.docs.map(async (doc) => {
+    let sentCount = 0;
+    let lastError: any = null;
+
+    for (const doc of usersSnap.docs) {
       const userData = doc.data();
-      if (userData.telegramChatId) {
-        return sendTelegramMessage(userData.telegramChatId, `💰 <b>Alpha Asset Intelligence</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${financeContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+      const chatId = userData.telegramChatId;
+      if (chatId) {
+        try {
+          const result = await sendTelegramMessage(chatId, `💰 <b>Alpha Asset Intelligence</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${financeContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+          if (result.ok) {
+            sentCount++;
+          } else {
+            lastError = result.error;
+          }
+        } catch (e: any) {
+          lastError = e.message;
+        }
+      }
+    }
+
+    return NextResponse.json({ 
+      success: sentCount > 0, 
+      processedUsers: usersSnap.docs.length,
+      sentCount,
+      lastError,
+      envCheck: {
+        hasToken: !!TELEGRAM_BOT_TOKEN,
+        tokenLength: TELEGRAM_BOT_TOKEN.length,
+        tokenPrefix: TELEGRAM_BOT_TOKEN.substring(0, 5)
       }
     });
-
-    await Promise.all(sendTasks);
-
-    return NextResponse.json({ success: true, message: 'Financial intelligence sent to all users.' });
   } catch (err: any) {
     console.error('[Finance News Cron Error]:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -20,8 +20,15 @@ async function sendTelegramMessage(chatId: string, text: string) {
 
 
 
-export async function GET(req: Request) {
+import { validateCronAuth } from '@/lib/cron-auth';
+
+export async function POST(req: Request) {
+  // Verify Authorization and Method
+  const authError = await validateCronAuth(req);
+  if (authError) return authError;
+
   const now = Date.now();
+
   try {
     const snapshot = await dbAdmin.collection('scheduled_notifications')
       .where('status', '==', 'pending')

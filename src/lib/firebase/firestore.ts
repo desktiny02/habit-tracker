@@ -451,6 +451,7 @@ export const deleteReward = async (rewardId: string) => {
 };
 
 export const redeemReward = async (userId: string, reward: Reward) => {
+  const redemptionRef = doc(collection(db, 'redemptions'));
   await runTransaction(db, async (transaction) => {
     const userRef = doc(db, 'users', userId);
     const userSnap = await transaction.get(userRef);
@@ -464,8 +465,6 @@ export const redeemReward = async (userId: string, reward: Reward) => {
       throw new Error(userSnap.exists() ? 'Insufficient points' : 'Insufficient points (Profile not found)');
     }
 
-
-    const redemptionRef = doc(collection(db, 'redemptions'));
     const redemption: Redemption = {
       id: redemptionRef.id, userId,
       rewardId: reward.id, rewardName: reward.name,
@@ -476,6 +475,7 @@ export const redeemReward = async (userId: string, reward: Reward) => {
     transaction.set(redemptionRef, redemption);
     transaction.update(userRef, { totalPoints: currentPoints - reward.cost });
   });
+  return redemptionRef.id;
 };
 
 export const useCoupon = async (redemptionId: string) => {

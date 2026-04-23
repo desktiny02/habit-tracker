@@ -69,28 +69,16 @@ function getWeatherEmoji(code: number) {
   return '☁️ Cloudy';
 }
 
-export async function GET(req: Request) {
+import { validateCronAuth } from '@/lib/cron-auth';
+
+export async function POST(req: Request) {
+  // 1. Verify Authorization and Method
+  const authError = await validateCronAuth(req);
+  if (authError) return authError;
+
   const { searchParams } = new URL(req.url);
-  const manualKey = searchParams.get('key');
   const forcedType = searchParams.get('type');
-  // 1. Verify Vercel Cron Authorization header OR Manual Key
-  const authHeader = req.headers.get('Authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  
-  const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (manualKey === 'HabitAppCronTest') || (cronSecret && manualKey === cronSecret); // Secret fallback for testing
-  
-  // If CRON_SECRET is NOT set in Vercel, we allow it for now but warn (fixes the user's issue)
-  const isAllowedToRun = isVercelCron || isManualTrigger || (process.env.NODE_ENV !== 'production') || !cronSecret;
 
-  if (!isAllowedToRun) {
-    console.error('[LINE Cron] Attempted access denied (Unauthorized).');
-    return new Response('Unauthorized - Access denied.', { status: 401 });
-  }
-
-  if (process.env.NODE_ENV === 'production' && !cronSecret) {
-    console.warn('[LINE Cron] CRON_SECRET is missing in environment variables. Access granted but insecure.');
-  }
 
   try {
     const now = new Date();

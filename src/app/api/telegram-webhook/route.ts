@@ -226,8 +226,8 @@ Schema:
   "targetDate": "YYYY-MM-DD" (only if once)
 }`;
           
-          // Using Gemini 3.1 Flash Lite Preview
-          const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`;
+          // Using Gemini Flash Latest
+          const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
           
           const aiRes = await fetch(aiUrl, {
             method: 'POST',

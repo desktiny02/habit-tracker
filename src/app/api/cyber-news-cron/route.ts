@@ -8,70 +8,92 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 async function sendTelegramMessage(chatId: string, text: string) {
-  if (!TELEGRAM_BOT_TOKEN) return;
-  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML'
-    }),
-  });
+  if (!TELEGRAM_BOT_TOKEN) return { ok: false, error: 'No Token' };
+
+  // Split text into chunks of max 4000 characters
+  const maxChars = 4000;
+  const chunks: string[] = [];
   
-  if (!res.ok) {
-    const errorData = await res.json();
-    console.error(`[Telegram] Send Message Failed:`, errorData);
-    if (errorData.description?.includes('can\'t parse entities')) {
-      // Fallback: Send without HTML if parser dies
-      return fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  if (text.length <= maxChars) {
+    chunks.push(text);
+  } else {
+    let remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxChars) {
+        chunks.push(remaining);
+        break;
+      }
+      let splitIndex = remaining.lastIndexOf('\n\n', maxChars);
+      if (splitIndex === -1) splitIndex = maxChars;
+      chunks.push(remaining.substring(0, splitIndex));
+      remaining = remaining.substring(splitIndex).trim();
+    }
+  }
+
+  let finalRes: { ok: boolean; error?: any } = { ok: true };
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkPrefix = chunks.length > 1 ? `[Part ${i+1}/${chunks.length}]\n` : '';
+    const chunkText = chunkPrefix + chunks[i];
+
+    let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: chunkText,
+        parse_mode: 'HTML'
+      }),
+    });
+
+    if (!res.ok) {
+      const plainText = chunkText.replace(/<[^>]*>?/gm, ''); 
+      res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId,
-          text: text.replace(/<[^>]*>?/gm, ''), // Strip tags for safety
+          text: plainText
         }),
       });
     }
+
+    if (!res.ok) {
+      const err = await res.json();
+      finalRes = { ok: false, error: err };
+    }
   }
-  return res;
+
+  return finalRes;
 }
 
 
-export async function GET(req: Request) {
-  // 1. Verify Authorization
-  const { searchParams } = new URL(req.url);
-  const key = searchParams.get('key');
-  const authHeader = req.headers.get('Authorization');
-  const cronSecret = process.env.CRON_SECRET;
+import { validateCronAuth } from '@/lib/cron-auth';
 
-  const isVercelCron = (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManualTrigger = (key === 'HabitAppCronTest') || (cronSecret && key === cronSecret);
-  // If CRON_SECRET is NOT set in Vercel, we allow it for now but warn (fixes the user's issue)
-  const isAllowedToRun = isVercelCron || isManualTrigger || !cronSecret || (process.env.NODE_ENV !== 'production');
+export async function POST(req: Request) {
+  // Verify Authorization and Method
+  const authError = await validateCronAuth(req);
+  if (authError) return authError;
 
-  if (!isAllowedToRun) {
-    console.error('[LINE Cron] Attempted access denied (Unauthorized).');
-    return new Response('Unauthorized - Access denied.', { status: 401 });
-  }
 
   try {
-    // 2. Fetch Latest Cybersecurity News via Gemini 3.1 Flash Lite
-    const prompt = `Act as a Cybersecurity and Tech Expert. SEARCH the internet for 3 to 5 STRICTLY high-impact or critical news stories from the last 24 hours (today is ${format(new Date(), 'yyyy-MM-dd')}).
+    // 2. Fetch Latest Cybersecurity News via Gemini 2.0 Flash (Expert Intelligence Educator)
+    const prompt = `Act as a Lead Cybersecurity Architect and Incident Response Expert teaching a masterclass.
+    
+SEARCH the internet for the most BREAKING, high-impact or critical cybersecurity events from the last 12-24 hours. Today is ${format(new Date(), 'eeee, MMMM do, yyyy')}.
 
 Requirements:
-- News MUST be focused on critical Cybersecurity threats or major IT/Tech world breakthroughs.
-- Each story MUST have a criticality status indicator: 🔴 (Red) for Critical, 🟠 (Orange) for High. Only include 🟡 (Yellow) if it is exceptionally relevant.
-- SORT the list strictly by criticality: all 🔴 Red first, then 🟠 Orange.
+- News MUST be focused on CRITICAL, LIVE threats or major IT breakthroughs from today.
+- Skip basics (e.g. don't explain what a Phishing attack is).
+- Focus on technical specifics: Zero-day mechanics, CVE deep-dives, or architectural vulnerabilities.
 
-For EACH story, provide:
-- The status indicator emoji followed by a bold headline that is hyperlinked to the original source URL. Use the exact format: <a href="URL"><b>Headline</b></a>
-- A concise summary (1-2 sentences)
+For EACH story:
+1. 🔴/🟠 <b>Headline (Hyperlinked Source)</b>: <a href="URL"><b>Headline</b></a>
+2. <b>The Exploit Architecture:</b> Explain the technical "How" at an expert level. Focus on the attack vector or the engineering flaw.
+3. <code>[Expert Learning Nugget]</code>: Teach a specialized technical concept related to this threat (e.g. the specifics of buffer overflow in this library, a new mitigation technique, or a niche protocol trick).
 
-IMPORTANT: Do not just introduce the news. You MUST output actual stories found. 
-ONLY USE THESE TAGS: <b>, <i>, <code>, <pre>, <a>. 
-STRICTLY FORBIDDEN: <h3>, <h4>, <ul>, <li>, <br/>, <p>, asterisk bullet points.
-Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stories with double newlines.`;
+CRITICAL: Use LIVE search data only. Speak like an expert to an expert.
+ONLY USE THESE TAGS: <b>, <i>, <code>, <pre>, <a>.`;
 
 
     const aiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`;
@@ -83,9 +105,7 @@ Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stor
         contents: [{
           parts: [{ text: prompt }]
         }],
-        tools: [{
-          google_search: {} // Enable Google Search grounding
-        }]
+        tools: [{ google_search: {} }]
       })
     });
 
@@ -108,21 +128,45 @@ Telegram's HTML parser is very strict. Use <b>bold</b> for titles. Separate stor
       .replace(/<h[1-6]>/g, '<b>').replace(/<\/h[1-6]>/g, '</b>\n')
       .replace(/<br\s*\/?>/g, '\n')
       .replace(/<ul>/g, '').replace(/<\/ul>/g, '')
-      .replace(/<li>/g, '• ').replace(/<\/li>/g, '\n');
+      .replace(/<li>/g, '• ').replace(/<\/li>/g, '\n')
+      .replace(/<div[^>]*>/g, '').replace(/<\/div>/g, '\n')
+      .replace(/<span[^>]*>/g, '').replace(/<\/span>/g, '')
+      .replace(/&nbsp;/g, ' ');
 
 
-    // 3. Send to all linked Telegram users
+    // 3. Broadcast to Users
     const usersSnap = await dbAdmin.collection('users').where('telegramChatId', '!=', '').get();
-    const sendTasks = usersSnap.docs.map(async (doc) => {
+    let sentCount = 0;
+    let lastError: any = null;
+
+    for (const doc of usersSnap.docs) {
       const userData = doc.data();
-      if (userData.telegramChatId) {
-        return sendTelegramMessage(userData.telegramChatId, `📰 <b>Morning Tech & Cyber Digest</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${newsContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+      const chatId = userData.telegramChatId;
+      if (chatId) {
+        try {
+          const result = await sendTelegramMessage(chatId, `📰 <b>Morning Tech & Cyber Digest</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n${newsContent}\n\n<i>Powered by HabitOS Intelligence</i>`);
+          if (result.ok) {
+            sentCount++;
+          } else {
+            lastError = result.error;
+          }
+        } catch (e: any) {
+          lastError = e.message;
+        }
+      }
+    }
+
+    return NextResponse.json({ 
+      success: sentCount > 0, 
+      processedUsers: usersSnap.docs.length,
+      sentCount,
+      lastError,
+      envCheck: {
+        hasToken: !!TELEGRAM_BOT_TOKEN,
+        tokenLength: TELEGRAM_BOT_TOKEN.length,
+        tokenPrefix: TELEGRAM_BOT_TOKEN.substring(0, 5)
       }
     });
-
-    await Promise.all(sendTasks);
-
-    return NextResponse.json({ success: true, message: 'Cybersecurity news sent to all users.' });
   } catch (err: any) {
     console.error('[Cyber News Cron Error]:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
