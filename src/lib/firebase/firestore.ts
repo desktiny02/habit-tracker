@@ -482,23 +482,4 @@ export const useCoupon = async (redemptionId: string) => {
   await updateDoc(doc(db, 'redemptions', redemptionId), { status: 'used' });
 };
 
-// ── Daily Bonus ──────────────────────────────────────────────────
-export const claimDailyLoginBonus = async (userId: string, todayStr: string) => {
-  const userRef = doc(db, 'users', userId);
-  const bonus = 1;
 
-  let result = 0;
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(userRef);
-    if (!snap.exists()) return;
-    const data = snap.data() as UserData;
-    if (data.lastLoginDate === todayStr) return; // already claimed
-
-    tx.update(userRef, {
-      totalPoints: (data.totalPoints || 0) + bonus,
-      lastLoginDate: todayStr
-    });
-    result = bonus;
-  });
-  return result;
-};

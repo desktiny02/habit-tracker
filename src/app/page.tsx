@@ -3,7 +3,7 @@
 import { useAuth } from '@/lib/firebase/auth';
 import AppLayout from '@/components/layout/AppLayout';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, deleteDailyLog, claimDailyLoginBonus } from '@/lib/firebase/firestore';
+import { getUserTasks, logDailyTask, deleteTask, autoMissPendingTasks, deleteDailyLog } from '@/lib/firebase/firestore';
 import { Task, LogStatus, DailyLog } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { Button } from '@/components/ui/button';
@@ -62,16 +62,7 @@ export default function DashboardPage() {
   }, [userData]);
 
 
-  // Handle Daily Login Bonus
-  useEffect(() => {
-    if (user && userData && !loading && userData.lastLoginDate !== todayStr) {
-      claimDailyLoginBonus(user.uid, todayStr).then((bonus) => {
-        if (bonus > 0) {
-          toast.success(`Welcome back! +${bonus} pts login bonus!`, { icon: '🎁' });
-        }
-      });
-    }
-  }, [user, userData, todayStr, loading]);
+
 
   useEffect(() => {
     if (!user) return;

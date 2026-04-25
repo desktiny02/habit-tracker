@@ -66,11 +66,11 @@ export default function RewardsPage() {
     setRedeemingId(reward.id);
     setConfirmingRewardId(null);
     try {
-      await redeemReward(user.uid, reward);
+      const realId = await redeemReward(user.uid, reward);
       toast.success(`Redeemed "${reward.name}"!`);
-      // Optimistically add new redemption to state instead of re-fetching
+      // Use the real ID from the server instead of optimistic ID
       const newRedemption: Redemption = {
-        id: `optimistic-${Date.now()}`,
+        id: realId,
         userId: user.uid,
         rewardId: reward.id,
         rewardName: reward.name,

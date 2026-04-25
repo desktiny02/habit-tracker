@@ -50,18 +50,7 @@ const sections = [
       'All point changes are reflected on the Dashboard stats card in real time.',
     ],
   },
-  {
-    icon: Flame,
-    title: 'Daily Login Bonus',
-    color: '#f97316',
-    badge: 'Bonus',
-    items: [
-      'Simply open the app each day to claim a free login bonus.',
-      'The bonus is awarded automatically on your first visit of the day.',
-      'It builds a small cushion of points to reward consistent app use.',
-      'You will see a toast notification with the bonus amount when it is claimed.',
-    ],
-  },
+
   {
     icon: RotateCcw,
     title: 'Undo a Log',
@@ -165,7 +154,7 @@ const sections = [
 const badgeColor: Record<string, string> = {
   Core:        'rgba(99,102,241,0.15)',
   Points:      'rgba(245,158,11,0.15)',
-  Bonus:       'rgba(249,115,22,0.15)',
+
   Dashboard:   'rgba(148,163,184,0.15)',
   Rewards:     'rgba(236,72,153,0.15)',
   Planning:    'rgba(56,189,248,0.15)',
@@ -176,7 +165,7 @@ const badgeColor: Record<string, string> = {
 const badgeText: Record<string, string> = {
   Core:        '#818cf8',
   Points:      '#fbbf24',
-  Bonus:       '#fb923c',
+
   Dashboard:   '#94a3b8',
   Rewards:     '#f472b6',
   Planning:    '#38bdf8',
